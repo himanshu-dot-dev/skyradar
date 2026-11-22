@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Radio, Clock, ShieldCheck, Plane } from 'lucide-react';
+import { Radio, Clock, ShieldCheck, Plane, Search } from 'lucide-react';
 import { useGlobeStore, AVIATION_HUBS, type AviationHub } from '../../store/globeStore';
 import { useAircraftStore } from '../../store/aircraftStore';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
@@ -15,6 +15,8 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
   const totalCount = useAircraftStore((s) => s.totalCount);
   const isSimulatedMode = useAircraftStore((s) => s.isSimulatedMode);
   const setSimulatedMode = useAircraftStore((s) => s.setSimulatedMode);
+  const isDrawerOpen = useAircraftStore((s) => s.isDrawerOpen);
+  const toggleDrawer = useAircraftStore((s) => s.toggleDrawer);
 
   // Live UTC Clock for aviation standards (ZULU time)
   useEffect(() => {
@@ -82,8 +84,28 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
           }}
         />
 
-        {/* Live Aircraft Count Indicator */}
-        <div
+        {/* Directory & Radar Drawer Toggle */}
+        <button
+          className={`glass-btn ${isDrawerOpen ? 'active' : ''}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            padding: '5px 12px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 0.6,
+          }}
+          title="Toggle Flight Directory & Search Filters"
+          onClick={toggleDrawer}
+        >
+          <Search size={13} color="var(--accent-cyan)" />
+          <span>DIRECTORY</span>
+        </button>
+
+        {/* Live Aircraft Count Indicator (clickable to toggle drawer) */}
+        <button
+          className="glass-btn"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -96,11 +118,14 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
             fontSize: 12,
             fontFamily: 'var(--font-mono)',
             fontWeight: 600,
+            cursor: 'pointer',
           }}
+          title="Click to toggle Flight Directory"
+          onClick={toggleDrawer}
         >
           <Plane size={14} />
           <span>{totalCount > 0 ? `${totalCount} ${isSimulatedMode ? 'SIMULATED' : 'LIVE FLIGHTS'}` : 'FETCHING LIVE FLEET...'}</span>
-        </div>
+        </button>
       </div>
 
       {/* Quick Hub Airport Shortcuts */}

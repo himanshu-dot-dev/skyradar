@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useGlobeStore, type ImageryLayerType } from '../../store/globeStore';
-import { useAircraftStore } from '../../store/aircraftStore';
+import { useAircraftStore, matchesFilters } from '../../store/aircraftStore';
 import { AircraftLayer } from './AircraftLayer';
 import { FlightPathLayer } from './FlightPathLayer';
 import { SimulatedTrafficGenerator } from '../../services/simulatedTraffic';
@@ -205,10 +205,16 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
       const currentSelectedId = useAircraftStore.getState().selectedAircraftId;
       const followingActive = useAircraftStore.getState().isFollowing;
       const pathsEnabled = useGlobeStore.getState().showFlightPaths;
+      const filters = useAircraftStore.getState().filters;
 
       useAircraftStore.getState().setAircraftList(updatedList);
-      aircraftLayer.update(updatedList, currentSelectedId);
-      flightPathLayer.update(updatedList, currentSelectedId);
+
+      const displayedList = filters.filterOnGlobe
+        ? updatedList.filter((ac) => ac.id === currentSelectedId || matchesFilters(ac, filters))
+        : updatedList;
+
+      aircraftLayer.update(displayedList, currentSelectedId);
+      flightPathLayer.update(displayedList, currentSelectedId);
 
       // Camera Follow tracking logic
       if (followingActive && currentSelectedId) {

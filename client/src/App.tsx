@@ -3,6 +3,7 @@ import { CesiumGlobe, type CesiumGlobeHandle } from './components/CesiumGlobe/Ce
 import { GlobeToolbar } from './components/Controls/GlobeToolbar';
 import { Header } from './components/Header/Header';
 import { AircraftTelemetryCard } from './components/Sidebar/AircraftTelemetryCard';
+import { AircraftSearchDrawer } from './components/Sidebar/AircraftSearchDrawer';
 import { Navigation, Plane } from 'lucide-react';
 import { useAircraftStore } from './store/aircraftStore';
 
@@ -22,6 +23,9 @@ export const App: React.FC = () => {
       {/* Top Glassmorphic Navigation Header */}
       <Header globeHandle={globeHandle} />
 
+      {/* Left-Hand Aircraft Directory & Radar Search Drawer */}
+      <AircraftSearchDrawer globeHandle={globeHandle} />
+
       {/* Floating HUD Camera & Layer Toolbar */}
       <GlobeToolbar globeHandle={globeHandle} />
 
@@ -34,7 +38,8 @@ export const App: React.FC = () => {
         style={{
           position: 'absolute',
           bottom: 14,
-          left: 20,
+          left: '50%',
+          transform: 'translateX(-50%)',
           zIndex: 10,
           padding: '6px 14px',
           display: 'flex',
@@ -42,6 +47,7 @@ export const App: React.FC = () => {
           gap: 16,
           fontSize: 11,
           color: 'var(--text-secondary)',
+          whiteSpace: 'nowrap',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

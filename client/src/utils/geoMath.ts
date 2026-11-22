@@ -140,3 +140,14 @@ export function formatAltitude(meters: number): { feetText: string; metersText: 
     flightLevel,
   };
 }
+
+/**
+ * Returns standard aviation altitude color coding based on altitude in feet
+ */
+export function getAltitudeColor(altitudeFeet: number): string {
+  if (altitudeFeet >= 30000) return '#00f0ff'; // Cruising: High electric cyan
+  if (altitudeFeet >= 18000) return '#38bdf8'; // Mid-high: Sky blue
+  if (altitudeFeet >= 10000) return '#10b981'; // Mid: Emerald green
+  if (altitudeFeet >= 3000) return '#f59e0b'; // Low climb/approach: Amber
+  return '#f43f5e'; // Very low / ground: Rose / Coral
+}
