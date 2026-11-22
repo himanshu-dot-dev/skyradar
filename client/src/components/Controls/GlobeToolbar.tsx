@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sun,
   Moon,
@@ -11,6 +11,7 @@ import {
   Route,
 } from 'lucide-react';
 import { useGlobeStore, AVIATION_HUBS, type AviationHub } from '../../store/globeStore';
+import { useAircraftStore } from '../../store/aircraftStore';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
 
 interface GlobeToolbarProps {
@@ -20,6 +21,9 @@ interface GlobeToolbarProps {
 export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showHubMenu, setShowHubMenu] = useState(false);
+  const [cameraHeadingDeg, setCameraHeadingDeg] = useState(0);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
 
   const imageryLayer = useGlobeStore((s) => s.imageryLayer);
   const enableLighting = useGlobeStore((s) => s.enableLighting);
@@ -29,6 +33,56 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   const toggleLighting = useGlobeStore((s) => s.toggleLighting);
   const toggleFlightPaths = useGlobeStore((s) => s.toggleFlightPaths);
   const selectHub = useGlobeStore((s) => s.selectHub);
+  const selectedAircraft = useAircraftStore((s) => s.selectedAircraft);
+
+  // Monitor live globe heading to dynamically rotate the Compass icon
+  useEffect(() => {
+    if (!globeHandle) return;
+    const viewer = globeHandle.getViewer();
+    if (!viewer || viewer.isDestroyed()) return;
+
+    const updateHeading = () => {
+      if (!viewer.isDestroyed()) {
+        const deg = Math.round((viewer.camera.heading * 180) / Math.PI);
+        setCameraHeadingDeg((deg % 360 + 360) % 360);
+      }
+    };
+
+    updateHeading();
+    const removeListener = viewer.camera.changed.addEventListener(updateHeading);
+    return () => {
+      if (!viewer.isDestroyed()) {
+        removeListener();
+      }
+    };
+  }, [globeHandle]);
+
+  const showToast = (msg: string) => {
+    if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
+    setToastMessage(msg);
+    toastTimeoutRef.current = window.setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleResetHeading = () => {
+    if (globeHandle) {
+      globeHandle.resetHeading();
+      showToast('🧭 Orientation Re-aligned: True North (0°)');
+    }
+  };
+
+  const handleToggleFlightPaths = () => {
+    const nextState = !showFlightPaths;
+    toggleFlightPaths();
+    if (nextState) {
+      if (selectedAircraft) {
+        showToast(`🔀 Trajectory Trails Active: Showing route for ${selectedAircraft.callsign || selectedAircraft.id.toUpperCase()}`);
+      } else {
+        showToast('🔀 Trajectory Trails Enabled: Click any aircraft on the globe to inspect its 3D flight path');
+      }
+    } else {
+      showToast('🔀 Trajectory Trails Disabled');
+    }
+  };
 
   const handleSelectHub = (hub: AviationHub) => {
     selectHub(hub);
@@ -86,13 +140,20 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
           <Minus size={18} />
         </button>
 
+        {/* Live Rotating Heading Compass */}
         <button
           className="glass-btn"
           style={{ width: 38, height: 38 }}
-          title="Reset Orientation (North Up)"
-          onClick={() => globeHandle?.resetHeading()}
+          title={`Reset Orientation: North Up (Current Heading: ${cameraHeadingDeg}°)`}
+          onClick={handleResetHeading}
         >
-          <Compass size={18} />
+          <Compass
+            size={18}
+            style={{
+              transform: `rotate(${-cameraHeadingDeg}deg)`,
+              transition: 'transform 0.15s ease-out',
+            }}
+          />
         </button>
 
         <div style={{ height: 1, backgroundColor: 'rgba(0, 240, 255, 0.2)', margin: '2px 4px' }} />
@@ -101,11 +162,40 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
         <button
           className={`glass-btn ${showFlightPaths ? 'active' : ''}`}
           style={{ width: 38, height: 38 }}
-          title={showFlightPaths ? 'Hide Flight Trajectory Trails' : 'Show Flight Trajectory Trails'}
-          onClick={toggleFlightPaths}
+          title={
+            showFlightPaths
+              ? selectedAircraft
+                ? `Hide Flight Trajectory Trails (Active for ${selectedAircraft.callsign || selectedAircraft.id.toUpperCase()})`
+                : 'Flight Trajectories: Enabled (Click any flight to view trajectory)'
+              : 'Show Flight Trajectory Trails'
+          }
+          onClick={handleToggleFlightPaths}
         >
           <Route size={18} color={showFlightPaths ? 'var(--accent-cyan)' : 'inherit'} />
         </button>
+
+        {/* Tactical HUD Toast Banner for Instruments Feedback */}
+        {toastMessage && (
+          <div
+            className="glass-panel"
+            style={{
+              position: 'absolute',
+              right: 56,
+              top: 90,
+              padding: '8px 14px',
+              fontSize: 12,
+              fontFamily: '"JetBrains Mono", monospace',
+              color: '#00f0ff',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 240, 255, 0.25)',
+              border: '1px solid rgba(0, 240, 255, 0.45)',
+              zIndex: 30,
+            }}
+          >
+            {toastMessage}
+          </div>
+        )}
 
         {/* Day / Night Sun Terminator */}
         <button

@@ -128,6 +128,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     scene.backgroundColor = Cesium.Color.fromCssColorString('#02040a');
 
     // Configure comprehensive mouse, scroll wheel & trackpad zoom controls
+    viewer.camera.percentageChanged = 0.002;
     const controller = scene.screenSpaceCameraController;
     controller.enableCollisionDetection = false; // Disabling prevents zoom freeze near surface/angles
     controller.enableZoom = true;
