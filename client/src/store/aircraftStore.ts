@@ -133,7 +133,17 @@ export const useAircraftStore = create<AircraftStoreState>((set) => ({
     }
 
     set((state) => {
-      const selected = state.selectedAircraftId ? map.get(state.selectedAircraftId) || null : null;
+      let selected = state.selectedAircraft;
+      if (state.selectedAircraftId) {
+        const found = map.get(state.selectedAircraftId);
+        if (found) {
+          selected = found;
+        }
+        // Retain existing selected aircraft if not in new batch so card doesn't close abruptly
+      } else {
+        selected = null;
+      }
+
       return {
         aircraftList: list,
         aircraftMap: map,

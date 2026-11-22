@@ -221,6 +221,7 @@ export class AircraftLayer {
    * Batch updates all aircraft billboards & callsign labels in a single frame
    */
   public update(aircraftList: NormalizedAircraft[], selectedId: string | null) {
+    if (!this.viewer || this.viewer.isDestroyed()) return;
     this.selectedId = selectedId;
     this.occluder.cameraPosition = this.viewer.camera.positionWC;
     const activeIds = new Set<string>();

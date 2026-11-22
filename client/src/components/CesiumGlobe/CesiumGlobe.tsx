@@ -163,17 +163,17 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     // Initial populate: Boot directly into live ADS-B by default!
     if (!useAircraftStore.getState().isSimulatedMode) {
       liveTraffic.fetchLive().then((list) => {
-        if (list && list.length > 0) {
-          useAircraftStore.getState().setAircraftList(list);
-          aircraftLayer.update(list, null);
-          flightPathLayer.update(list, null);
-        }
+        if (!viewer || viewer.isDestroyed()) return;
+        const validList = list && list.length > 0 ? list : simTraffic.update(0);
+        useAircraftStore.getState().setAircraftList(validList);
+        aircraftLayer.update(validList, null);
+        flightPathLayer.update(validList, null, useGlobeStore.getState().showFlightPaths);
       });
     } else {
       const initialList = simTraffic.update(0);
       useAircraftStore.getState().setAircraftList(initialList);
       aircraftLayer.update(initialList, null);
-      flightPathLayer.update(initialList, null);
+      flightPathLayer.update(initialList, null, useGlobeStore.getState().showFlightPaths);
     }
 
     // Animation Loop: updates aircraft position, dotted paths & camera follow
@@ -189,8 +189,8 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
       if (isSimMode) {
         updatedList = simTraffic.update(deltaSeconds);
       } else {
-        // Poll backend live feed every 6.5s or immediately if empty
-        if (currentTime - lastLivePollRef.current > 6500 || liveTraffic.getAircraftList().length === 0) {
+        // Poll backend live feed every 6.5s
+        if (currentTime - lastLivePollRef.current > 6500) {
           lastLivePollRef.current = currentTime;
           liveTraffic.fetchLive();
         }
@@ -214,7 +214,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
         : updatedList;
 
       aircraftLayer.update(displayedList, currentSelectedId);
-      flightPathLayer.update(displayedList, currentSelectedId);
+      flightPathLayer.update(displayedList, currentSelectedId, pathsEnabled);
 
       // Camera Follow tracking logic
       if (followingActive && currentSelectedId) {
@@ -226,12 +226,16 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
             targetAircraft.position.altitudeMeters
           );
 
+          // Preserve distance if user zoomed, or default to 65km chase view
+          const currentDist = Cesium.Cartesian3.distance(viewer.camera.positionWC, targetPos);
+          const followRange = currentDist > 2000 && currentDist < 2000000 ? currentDist : 65000;
+
           viewer.camera.lookAt(
             targetPos,
             new Cesium.HeadingPitchRange(
               Cesium.Math.toRadians(targetAircraft.movement.heading - 180),
               Cesium.Math.toRadians(-35),
-              65000
+              followRange
             )
           );
           wasFollowingRef.current = true;

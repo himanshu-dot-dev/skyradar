@@ -92,14 +92,16 @@ export class FlightPathLayer {
    */
   public update(
     aircraftList: NormalizedAircraft[],
-    selectedId: string | null
+    selectedId: string | null,
+    showFlightPaths = true
   ) {
+    if (!this.viewer || this.viewer.isDestroyed()) return;
     this.currentSelectedId = selectedId;
     this.occluder.cameraPosition = this.viewer.camera.positionWC;
 
     const selectedAircraft = selectedId ? aircraftList.find((ac) => ac.id === selectedId) : null;
 
-    if (selectedAircraft && !selectedAircraft.position.isGround) {
+    if (showFlightPaths && selectedAircraft && !selectedAircraft.position.isGround) {
       const alt = selectedAircraft.position.altitudeMeters;
       let pastPositions: Cesium.Cartesian3[];
       let futurePositions: Cesium.Cartesian3[];
