@@ -1,0 +1,28 @@
+{
+  "name": "skyradar",
+  "version": "1.0.0",
+  "description": "SkyRadar — Real-Time 3D Global Flight Tracker",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "dev:client": "npm --workspace=client run dev",
+    "dev:server": "npm --workspace=server run dev",
+    "build:client": "npm --workspace=client run build",
+    "build:server": "npm --workspace=server run build",
+    "build": "npm --workspace=client run build && npm --workspace=server run build",
+    "lint": "npm --workspace=client run lint"
+  },
+  "keywords": [
+    "cesium",
+    "flight-tracker",
+    "adsb",
+    "3d-globe",
+    "radar"
+  ],
+  "author": "",
+  "license": "MIT"
+}
