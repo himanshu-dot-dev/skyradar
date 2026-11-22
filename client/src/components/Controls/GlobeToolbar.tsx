@@ -10,7 +10,6 @@ import {
   Layers,
   MapPin,
   ChevronDown,
-  Route,
 } from 'lucide-react';
 import { useGlobeStore, AVIATION_HUBS, type ImageryLayerType, type AviationHub } from '../../store/globeStore';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
@@ -25,11 +24,9 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
 
   const imageryLayer = useGlobeStore((s) => s.imageryLayer);
   const enableLighting = useGlobeStore((s) => s.enableLighting);
-  const showFlightPaths = useGlobeStore((s) => s.showFlightPaths);
   const selectedHub = useGlobeStore((s) => s.selectedHub);
   const setImageryLayer = useGlobeStore((s) => s.setImageryLayer);
   const toggleLighting = useGlobeStore((s) => s.toggleLighting);
-  const toggleFlightPaths = useGlobeStore((s) => s.toggleFlightPaths);
   const selectHub = useGlobeStore((s) => s.selectHub);
 
   const handleSelectHub = (hub: AviationHub) => {
@@ -167,16 +164,6 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
           onClick={toggleLighting}
         >
           {enableLighting ? <Sun size={18} color="var(--accent-amber)" /> : <Sun size={18} />}
-        </button>
-
-        {/* Global Dotted Flight Paths Layer Toggle */}
-        <button
-          className={`glass-btn ${showFlightPaths ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title={showFlightPaths ? 'Hide Flight Route Paths' : 'Show Flight Route Paths (Dotted Great-Circle Trajectories)'}
-          onClick={toggleFlightPaths}
-        >
-          <Route size={18} color={showFlightPaths ? 'var(--accent-cyan)' : 'inherit'} />
         </button>
 
         {/* Aviation Hubs Teleport Menu */}

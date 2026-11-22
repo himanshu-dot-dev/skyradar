@@ -6,6 +6,8 @@ import { useAircraftStore } from '../../store/aircraftStore';
 import { AircraftLayer } from './AircraftLayer';
 import { FlightPathLayer } from './FlightPathLayer';
 import { SimulatedTrafficGenerator } from '../../services/simulatedTraffic';
+import { LiveTrafficService } from '../../services/liveTraffic';
+import type { NormalizedAircraft } from '@shared/types';
 
 // Explicitly set Cesium base URL for static assets/workers and suppress Ion warnings
 (Cesium.buildModuleUrl as any).setBaseUrl('/cesium/');
@@ -62,6 +64,8 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
   const aircraftLayerRef = useRef<AircraftLayer | null>(null);
   const flightPathLayerRef = useRef<FlightPathLayer | null>(null);
   const simTrafficRef = useRef<SimulatedTrafficGenerator | null>(null);
+  const liveTrafficRef = useRef<LiveTrafficService | null>(null);
+  const lastLivePollRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(performance.now());
   const wasFollowingRef = useRef<boolean>(false);
@@ -150,15 +154,27 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     flightPathLayerRef.current = flightPathLayer;
     (window as any).__flightPathLayer = flightPathLayer;
 
-    // Initialize Simulation Engine
+    // Initialize Simulation Engine & Live Traffic Service
     const simTraffic = new SimulatedTrafficGenerator();
     simTrafficRef.current = simTraffic;
+    const liveTraffic = new LiveTrafficService();
+    liveTrafficRef.current = liveTraffic;
 
-    // Initial populate
-    const initialList = simTraffic.update(0);
-    useAircraftStore.getState().setAircraftList(initialList);
-    aircraftLayer.update(initialList, null);
-    flightPathLayer.update(initialList, null, useGlobeStore.getState().showFlightPaths);
+    // Initial populate: Boot directly into live ADS-B by default!
+    if (!useAircraftStore.getState().isSimulatedMode) {
+      liveTraffic.fetchLive().then((list) => {
+        if (list && list.length > 0) {
+          useAircraftStore.getState().setAircraftList(list);
+          aircraftLayer.update(list, null);
+          flightPathLayer.update(list, null);
+        }
+      });
+    } else {
+      const initialList = simTraffic.update(0);
+      useAircraftStore.getState().setAircraftList(initialList);
+      aircraftLayer.update(initialList, null);
+      flightPathLayer.update(initialList, null);
+    }
 
     // Animation Loop: updates aircraft position, dotted paths & camera follow
     const loop = (currentTime: number) => {
@@ -167,14 +183,32 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
       const deltaSeconds = Math.min((currentTime - lastTimeRef.current) / 1000, 0.1);
       lastTimeRef.current = currentTime;
 
-      const updatedList = simTraffic.update(deltaSeconds);
+      const isSimMode = useAircraftStore.getState().isSimulatedMode;
+      let updatedList: NormalizedAircraft[];
+
+      if (isSimMode) {
+        updatedList = simTraffic.update(deltaSeconds);
+      } else {
+        // Poll backend live feed every 6.5s or immediately if empty
+        if (currentTime - lastLivePollRef.current > 6500 || liveTraffic.getAircraftList().length === 0) {
+          lastLivePollRef.current = currentTime;
+          liveTraffic.fetchLive();
+        }
+        const liveList = liveTraffic.getAircraftList();
+        if (liveList.length > 0) {
+          updatedList = liveTraffic.updatePositions(deltaSeconds);
+        } else {
+          updatedList = simTraffic.update(deltaSeconds);
+        }
+      }
+
       const currentSelectedId = useAircraftStore.getState().selectedAircraftId;
       const followingActive = useAircraftStore.getState().isFollowing;
       const pathsEnabled = useGlobeStore.getState().showFlightPaths;
 
       useAircraftStore.getState().setAircraftList(updatedList);
       aircraftLayer.update(updatedList, currentSelectedId);
-      flightPathLayer.update(updatedList, currentSelectedId, pathsEnabled);
+      flightPathLayer.update(updatedList, currentSelectedId);
 
       // Camera Follow tracking logic
       if (followingActive && currentSelectedId) {

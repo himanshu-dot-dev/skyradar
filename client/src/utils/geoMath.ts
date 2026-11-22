@@ -89,6 +89,31 @@ export function interpolateGreatCircle(p1: LatLon, p2: LatLon, f: number): LatLo
 }
 
 /**
+ * Computes destination point given start point, bearing in degrees, and distance in km
+ */
+export function calculateDestinationPoint(start: LatLon, bearingDeg: number, distanceKm: number): LatLon {
+  const d = distanceKm / EARTH_RADIUS_KM;
+  const brng = bearingDeg * TO_RAD;
+  const lat1 = start.latitude * TO_RAD;
+  const lon1 = start.longitude * TO_RAD;
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng)
+  );
+  const lon2 =
+    lon1 +
+    Math.atan2(
+      Math.sin(brng) * Math.sin(d) * Math.cos(lat1),
+      Math.cos(d) - Math.sin(lat1) * Math.sin(lat2)
+    );
+
+  return {
+    latitude: lat2 * TO_DEG,
+    longitude: ((lon2 * TO_DEG + 540) % 360) - 180,
+  };
+}
+
+/**
  * Formats heading into standard 16-point cardinal compass text (e.g. 270 -> 'W')
  */
 export function headingToCompass(heading: number): string {

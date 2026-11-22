@@ -14,6 +14,7 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
   const selectHub = useGlobeStore((s) => s.selectHub);
   const totalCount = useAircraftStore((s) => s.totalCount);
   const isSimulatedMode = useAircraftStore((s) => s.isSimulatedMode);
+  const setSimulatedMode = useAircraftStore((s) => s.setSimulatedMode);
 
   // Live UTC Clock for aviation standards (ZULU time)
   useEffect(() => {
@@ -87,17 +88,18 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            color: 'var(--accent-cyan)',
-            backgroundColor: 'rgba(0, 240, 255, 0.08)',
+            color: isSimulatedMode ? 'var(--accent-amber)' : 'var(--accent-cyan)',
+            backgroundColor: isSimulatedMode ? 'rgba(245, 158, 11, 0.08)' : 'rgba(0, 240, 255, 0.08)',
             padding: '4px 10px',
             borderRadius: 6,
-            border: '1px solid var(--border-cyan)',
+            border: `1px solid ${isSimulatedMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-cyan)'}`,
             fontSize: 12,
             fontFamily: 'var(--font-mono)',
+            fontWeight: 600,
           }}
         >
           <Plane size={14} />
-          <span>{totalCount} TRACKED</span>
+          <span>{totalCount > 0 ? `${totalCount} ${isSimulatedMode ? 'SIMULATED' : 'LIVE FLIGHTS'}` : 'FETCHING LIVE FLEET...'}</span>
         </div>
       </div>
 
@@ -125,24 +127,41 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
 
       {/* Mode Indicator & UTC Clock */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        {/* Simulation / Live Badge */}
-        <div
+        {/* Simulation / Live Interactive Toggle Button */}
+        <button
+          className="glass-btn"
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 7,
             fontSize: 11,
-            fontWeight: 600,
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            cursor: 'pointer',
             color: isSimulatedMode ? 'var(--accent-amber)' : 'var(--accent-emerald)',
-            backgroundColor: isSimulatedMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-            padding: '4px 10px',
+            backgroundColor: isSimulatedMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+            padding: '5px 12px',
             borderRadius: 6,
-            border: `1px solid ${isSimulatedMode ? 'rgba(245, 158, 11, 0.35)' : 'rgba(16, 185, 129, 0.35)'}`,
+            border: `1px solid ${isSimulatedMode ? 'rgba(245, 158, 11, 0.45)' : 'rgba(16, 185, 129, 0.45)'}`,
+            boxShadow: isSimulatedMode ? 'none' : '0 0 12px rgba(16, 185, 129, 0.3)',
           }}
+          title={isSimulatedMode ? 'Click to switch to LIVE ADS-B real-world flights' : 'Click to switch to SIMULATED worldwide corridors'}
+          onClick={() => setSimulatedMode(!isSimulatedMode)}
         >
-          <Radio size={12} />
-          <span>{isSimulatedMode ? 'SIMULATED DATA' : 'LIVE ADS-B'}</span>
-        </div>
+          <Radio size={13} />
+          <span>{isSimulatedMode ? 'SIMULATED DEMO' : 'LIVE ADS-B'}</span>
+          <span
+            style={{
+              fontSize: 9,
+              textTransform: 'uppercase',
+              backgroundColor: isSimulatedMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(16, 185, 129, 0.25)',
+              padding: '1px 5px',
+              borderRadius: 4,
+            }}
+          >
+            {isSimulatedMode ? 'CLICK FOR LIVE' : 'ONLINE'}
+          </span>
+        </button>
 
         {/* UTC Clock */}
         <div

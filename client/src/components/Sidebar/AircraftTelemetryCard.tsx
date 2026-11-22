@@ -50,7 +50,7 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
       globeHandle.flyToHub(
         position.latitude,
         position.longitude,
-        Math.max(12000, position.altitudeMeters * 3.5)
+        Math.max(350000, position.altitudeMeters * 18)
       );
     }
   };
@@ -105,8 +105,8 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
         </button>
       </div>
 
-      {/* Simulated Data Badge */}
-      {selectedAircraft.isSimulated && (
+      {/* Simulated or Live Data Badge */}
+      {selectedAircraft.isSimulated ? (
         <div
           style={{
             display: 'flex',
@@ -123,6 +123,27 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
             SIMULATED FLIGHT
           </span>
           <span style={{ color: 'var(--text-muted)' }}>Global Corridor Model</span>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            padding: '5px 10px',
+            borderRadius: 6,
+            fontSize: 11,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--accent-emerald)', boxShadow: '0 0 6px var(--accent-emerald)' }} />
+            <span style={{ color: 'var(--accent-emerald)', fontWeight: 600, letterSpacing: 0.5 }}>
+              LIVE RADAR
+            </span>
+          </div>
+          <span style={{ color: 'var(--text-muted)' }}>OpenSky Network (ADS-B)</span>
         </div>
       )}
 
@@ -167,8 +188,8 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
         </div>
       </div>
 
-      {/* Flight Route Corridor & Waypoints */}
-      {selectedAircraft.route && (
+      {/* Flight Route Corridor & Waypoints or Live Flight Vector */}
+      {selectedAircraft.route ? (
         <div
           style={{
             backgroundColor: 'rgba(15, 23, 42, 0.65)',
@@ -234,6 +255,74 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 100, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {selectedAircraft.route.destinationCity}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            padding: '12px',
+            borderRadius: 6,
+            border: '1px solid var(--border-cyan)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 10, color: 'var(--accent-emerald)', fontWeight: 600 }}>ORIGIN</span>
+                <span className="font-mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {compassText}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Past Trail
+              </div>
+            </div>
+
+            <div style={{ flex: 1, padding: '0 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: '100%', position: 'relative', height: 16, display: 'flex', alignItems: 'center' }}>
+                <div
+                  style={{
+                    width: '100%',
+                    height: 2,
+                    background: 'repeating-linear-gradient(90deg, rgba(0, 240, 255, 0.4), rgba(0, 240, 255, 0.4) 4px, transparent 4px, transparent 8px)',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    transform: 'translate(-50%, 0)',
+                    color: 'var(--accent-cyan)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    filter: 'drop-shadow(0 0 6px rgba(0, 240, 255, 0.8))',
+                  }}
+                >
+                  <Plane size={15} style={{ transform: 'rotate(90deg)' }} />
+                </div>
+              </div>
+
+              <span className="font-mono" style={{ fontSize: 10, color: 'var(--accent-cyan)', fontWeight: 600 }}>
+                ACTIVE VECTOR • {movement.speedKnots} KTS
+              </span>
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                <span className="font-mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {movement.heading}°
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--accent-amber)', fontWeight: 600 }}>HDG</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Projected
               </div>
             </div>
           </div>

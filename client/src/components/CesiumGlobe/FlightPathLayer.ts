@@ -1,6 +1,6 @@
 import * as Cesium from 'cesium';
 import type { NormalizedAircraft } from '@shared/types';
-import { interpolateGreatCircle } from '../../utils/geoMath';
+import { interpolateGreatCircle, calculateDestinationPoint } from '../../utils/geoMath';
 
 export class FlightPathLayer {
   private viewer: Cesium.Viewer;
@@ -11,9 +11,6 @@ export class FlightPathLayer {
   // Selected aircraft flight path lines
   private selectedPastPolyline: Cesium.Polyline | null = null;
   private selectedFuturePolyline: Cesium.Polyline | null = null;
-
-  // All flights subtle route paths
-  private routePolylines: Map<string, Cesium.Polyline> = new Map();
 
   // Waypoint labels for origin and destination
   private originLabel: Cesium.Label | null = null;
@@ -91,90 +88,66 @@ export class FlightPathLayer {
   }
 
   /**
-   * Updates flight paths and waypoint badges
+   * Updates flight paths and waypoint badges for the selected aircraft
    */
   public update(
     aircraftList: NormalizedAircraft[],
-    selectedId: string | null,
-    showAllPaths: boolean
+    selectedId: string | null
   ) {
     this.currentSelectedId = selectedId;
     this.occluder.cameraPosition = this.viewer.camera.positionWC;
-    const activeRouteIds = new Set<string>();
 
-    // --- 1. Global Dotted Paths for Visible Fleet ---
-    if (showAllPaths) {
-      for (const ac of aircraftList) {
-        if (!ac.route) continue;
-
-        let polyline = this.routePolylines.get(ac.id);
-        const arcPositions = this.generateArc(
-          ac.route.originPosition,
-          ac.route.destinationPosition,
-          0.0,
-          1.0,
-          ac.position.altitudeMeters,
-          20
-        );
-
-        // Horizon occlusion: check if any part of the route is facing camera
-        const originVis = this.occluder.isPointVisible(arcPositions[0]);
-        const destVis = this.occluder.isPointVisible(arcPositions[arcPositions.length - 1]);
-        const midVis = this.occluder.isPointVisible(arcPositions[Math.floor(arcPositions.length / 2)]);
-        const isRouteVisible = originVis || destVis || midVis;
-
-        activeRouteIds.add(ac.id);
-
-        if (!polyline) {
-          polyline = this.polylineCollection.add({
-            positions: arcPositions,
-            width: 1.6,
-            show: isRouteVisible,
-            material: Cesium.Material.fromType('PolylineDash', {
-              color: Cesium.Color.fromCssColorString('rgba(0, 240, 255, 0.28)'),
-              gapColor: Cesium.Color.TRANSPARENT,
-              dashLength: 14.0,
-              dashPattern: 255,
-            }),
-          });
-          this.routePolylines.set(ac.id, polyline);
-        } else {
-          polyline.show = isRouteVisible;
-          polyline.positions = arcPositions;
-        }
-      }
-    }
-
-    // Clean up stale or disabled route polylines
-    for (const [id, poly] of this.routePolylines.entries()) {
-      if (!showAllPaths || !activeRouteIds.has(id)) {
-        this.polylineCollection.remove(poly);
-        this.routePolylines.delete(id);
-      }
-    }
-
-    // --- 2. Detailed Dotted Path for Selected Aircraft ---
     const selectedAircraft = selectedId ? aircraftList.find((ac) => ac.id === selectedId) : null;
 
-    if (selectedAircraft && selectedAircraft.route) {
-      const route = selectedAircraft.route;
-      const progress = Math.max(0.01, Math.min(0.99, route.progress));
+    if (selectedAircraft && !selectedAircraft.position.isGround) {
       const alt = selectedAircraft.position.altitudeMeters;
+      let pastPositions: Cesium.Cartesian3[];
+      let futurePositions: Cesium.Cartesian3[];
+      let originPos: Cesium.Cartesian3;
+      let destPos: Cesium.Cartesian3;
+      let depBadgeText: string;
+      let arrBadgeText: string;
 
-      // A) Where it came from (Past route: Origin -> Current Position)
-      const pastPositions = this.generateArc(
-        route.originPosition,
-        route.destinationPosition,
-        0.0,
-        progress,
-        alt,
-        25
-      );
+      if (selectedAircraft.route) {
+        const route = selectedAircraft.route;
+        const progress = Math.max(0.01, Math.min(0.99, route.progress));
+        pastPositions = this.generateArc(route.originPosition, route.destinationPosition, 0.0, progress, alt, 25);
+        futurePositions = this.generateArc(route.originPosition, route.destinationPosition, progress, 1.0, alt, 25);
+        originPos = Cesium.Cartesian3.fromDegrees(route.originPosition.longitude, route.originPosition.latitude, 300);
+        destPos = Cesium.Cartesian3.fromDegrees(route.destinationPosition.longitude, route.destinationPosition.latitude, 300);
+        depBadgeText = `🛫 DEP: ${route.originCode} (${route.originCity})`;
+        arrBadgeText = `🛬 ARR: ${route.destinationCode} (${route.destinationCity})`;
+      } else {
+        // Live ADS-B flight: calculate dynamic historical track & projected flight trajectory
+        const heading = selectedAircraft.movement.heading;
+        const speed = Math.max(150, selectedAircraft.movement.speedKnots);
+        const trailKm = Math.min(250, speed * 0.45);
+        const projKm = Math.min(400, speed * 0.7);
+
+        const pastPt = calculateDestinationPoint(selectedAircraft.position, (heading + 180) % 360, trailKm);
+        const futurePt = calculateDestinationPoint(selectedAircraft.position, heading, projKm);
+
+        pastPositions = this.generateArc(pastPt, selectedAircraft.position, 0.0, 1.0, alt, 20);
+        futurePositions = this.generateArc(selectedAircraft.position, futurePt, 0.0, 1.0, alt, 20);
+
+        originPos = Cesium.Cartesian3.fromDegrees(pastPt.longitude, pastPt.latitude, 300);
+        destPos = Cesium.Cartesian3.fromDegrees(futurePt.longitude, futurePt.latitude, 300);
+
+        depBadgeText = `🛫 PAST TRAIL (${Math.round(trailKm)} km)`;
+        arrBadgeText = `🛬 HDG: ${heading}° (${Math.round(projKm)} km)`;
+      }
+
+      // Past path visibility (origin to current aircraft)
+      const isOriginVisible = this.occluder.isPointVisible(originPos);
+      const isDestVisible = this.occluder.isPointVisible(destPos);
+      const pastVisible = isOriginVisible || this.occluder.isPointVisible(pastPositions[pastPositions.length - 1]);
+      const futureVisible = isDestVisible || this.occluder.isPointVisible(futurePositions[0]);
 
       if (!this.selectedPastPolyline) {
         this.selectedPastPolyline = this.polylineCollection.add({
           positions: pastPositions,
-          width: 2.8,
+          width: 3.5,
+          show: pastVisible,
           material: Cesium.Material.fromType('PolylineDash', {
             color: Cesium.Color.fromCssColorString('#00f0ff'),
             gapColor: Cesium.Color.TRANSPARENT,
@@ -183,68 +156,33 @@ export class FlightPathLayer {
           }),
         });
       } else {
-        this.selectedPastPolyline.show = true;
+        this.selectedPastPolyline.show = pastVisible;
         this.selectedPastPolyline.positions = pastPositions;
       }
 
-      // B) Where it is going (Future route: Current Position -> Destination)
-      const futurePositions = this.generateArc(
-        route.originPosition,
-        route.destinationPosition,
-        progress,
-        1.0,
-        alt,
-        25
-      );
-
+      // Future path visibility (current aircraft to destination)
       if (!this.selectedFuturePolyline) {
         this.selectedFuturePolyline = this.polylineCollection.add({
           positions: futurePositions,
-          width: 2.2,
+          width: 2.8,
+          show: futureVisible,
           material: Cesium.Material.fromType('PolylineDash', {
-            color: Cesium.Color.fromCssColorString('rgba(148, 163, 184, 0.75)'),
+            color: Cesium.Color.fromCssColorString('rgba(148, 163, 184, 0.85)'),
             gapColor: Cesium.Color.TRANSPARENT,
             dashLength: 16.0,
             dashPattern: 255,
           }),
         });
       } else {
-        this.selectedFuturePolyline.show = true;
-        this.selectedFuturePolyline.positions = futurePositions;
-      }
-
-      // C) Origin & Destination Waypoint Badges on the Globe
-      const originPos = Cesium.Cartesian3.fromDegrees(
-        route.originPosition.longitude,
-        route.originPosition.latitude,
-        300
-      );
-      const destPos = Cesium.Cartesian3.fromDegrees(
-        route.destinationPosition.longitude,
-        route.destinationPosition.latitude,
-        300
-      );
-
-      const isOriginVisible = this.occluder.isPointVisible(originPos);
-      const isDestVisible = this.occluder.isPointVisible(destPos);
-
-      // Past path visibility (origin to current aircraft)
-      const pastVisible = isOriginVisible || this.occluder.isPointVisible(pastPositions[pastPositions.length - 1]);
-      if (this.selectedPastPolyline) {
-        this.selectedPastPolyline.show = pastVisible;
-      }
-
-      // Future path visibility (current aircraft to destination)
-      const futureVisible = isDestVisible || this.occluder.isPointVisible(futurePositions[0]);
-      if (this.selectedFuturePolyline) {
         this.selectedFuturePolyline.show = futureVisible;
+        this.selectedFuturePolyline.positions = futurePositions;
       }
 
       // Origin Pin & Label
       if (!this.originLabel) {
         this.originLabel = this.labelCollection.add({
           position: originPos,
-          text: `🛫 DEP: ${route.originCode} (${route.originCity})`,
+          text: depBadgeText,
           font: 'bold 12px "JetBrains Mono", monospace',
           fillColor: Cesium.Color.WHITE,
           outlineColor: Cesium.Color.BLACK,
@@ -260,14 +198,14 @@ export class FlightPathLayer {
       } else {
         this.originLabel.show = isOriginVisible;
         this.originLabel.position = originPos;
-        this.originLabel.text = `🛫 DEP: ${route.originCode} (${route.originCity})`;
+        this.originLabel.text = depBadgeText;
       }
 
       // Destination Pin & Label
       if (!this.destLabel) {
         this.destLabel = this.labelCollection.add({
           position: destPos,
-          text: `🛬 ARR: ${route.destinationCode} (${route.destinationCity})`,
+          text: arrBadgeText,
           font: 'bold 12px "JetBrains Mono", monospace',
           fillColor: Cesium.Color.WHITE,
           outlineColor: Cesium.Color.BLACK,
@@ -283,10 +221,10 @@ export class FlightPathLayer {
       } else {
         this.destLabel.show = isDestVisible;
         this.destLabel.position = destPos;
-        this.destLabel.text = `🛬 ARR: ${route.destinationCode} (${route.destinationCity})`;
+        this.destLabel.text = arrBadgeText;
       }
 
-      // Ground radar beacons at airports
+      // Ground radar beacons at endpoints
       if (!this.originBillboard && this.airportPinTexture) {
         this.originBillboard = this.billboardCollection.add({
           position: originPos,
@@ -329,7 +267,6 @@ export class FlightPathLayer {
       this.viewer.scene.primitives.remove(this.labelCollection);
       this.viewer.scene.primitives.remove(this.billboardCollection);
     }
-    this.routePolylines.clear();
     this.selectedPastPolyline = null;
     this.selectedFuturePolyline = null;
     this.originLabel = null;

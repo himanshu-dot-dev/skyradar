@@ -26,7 +26,7 @@ export const useAircraftStore = create<AircraftStoreState>((set) => ({
   selectedAircraftId: null,
   selectedAircraft: null,
   isFollowing: false,
-  isSimulatedMode: true,
+  isSimulatedMode: false,
   totalCount: 0,
   liveCount: 0,
   simulatedCount: 0,
