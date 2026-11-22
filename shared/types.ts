@@ -12,6 +12,7 @@ export type EmergencyStatus =
   | 'reserved';
 
 export type DataSourceType =
+  | 'fr24'
   | 'airplanes.live'
   | 'adsb.lol'
   | 'opensky'

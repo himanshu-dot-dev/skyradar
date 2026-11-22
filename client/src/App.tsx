@@ -54,7 +54,8 @@ export const App: React.FC = () => {
           <Navigation size={13} color="var(--accent-cyan)" />
           <span>
             <strong style={{ color: 'var(--text-primary)' }}>Left Drag:</strong> Rotate |{' '}
-            <strong style={{ color: 'var(--text-primary)' }}>Scroll:</strong> Zoom |{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>Scroll / Right Drag:</strong> Zoom |{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>Double Click:</strong> Zoom In |{' '}
             <strong style={{ color: 'var(--text-primary)' }}>Middle Drag:</strong> Tilt
           </span>
         </div>

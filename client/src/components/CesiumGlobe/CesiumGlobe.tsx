@@ -127,10 +127,54 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     globe.depthTestAgainstTerrain = false;
     scene.backgroundColor = Cesium.Color.fromCssColorString('#02040a');
 
-    // Smooth camera limits
-    scene.screenSpaceCameraController.enableCollisionDetection = true;
-    scene.screenSpaceCameraController.minimumZoomDistance = 500;
-    scene.screenSpaceCameraController.maximumZoomDistance = 45000000;
+    // Configure comprehensive mouse, scroll wheel & trackpad zoom controls
+    const controller = scene.screenSpaceCameraController;
+    controller.enableCollisionDetection = false; // Disabling prevents zoom freeze near surface/angles
+    controller.enableZoom = true;
+    controller.minimumZoomDistance = 100;
+    controller.maximumZoomDistance = 50000000;
+    controller.inertiaZoom = 0.8;
+
+    // Enable all mouse zoom modes: Wheel, Trackpad Pinch (Wheel+Ctrl), and Right-Click Drag
+    controller.zoomEventTypes = [
+      Cesium.CameraEventType.RIGHT_DRAG,
+      Cesium.CameraEventType.WHEEL,
+      Cesium.CameraEventType.PINCH,
+      {
+        eventType: Cesium.CameraEventType.WHEEL,
+        modifier: Cesium.KeyboardEventModifier.CTRL,
+      },
+      {
+        eventType: Cesium.CameraEventType.RIGHT_DRAG,
+        modifier: Cesium.KeyboardEventModifier.CTRL,
+      },
+    ];
+
+    // Guarantee mouse wheel events are never swallowed by browser page-scroll defaults
+    const onCanvasWheel = (e: WheelEvent) => {
+      e.preventDefault();
+    };
+    viewer.scene.canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
+
+    // Double-click anywhere on Earth to smoothly zoom in towards the clicked location
+    const doubleClickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    doubleClickHandler.setInputAction((movement: { position: Cesium.Cartesian2 }) => {
+      const ray = viewer.camera.getPickRay(movement.position);
+      if (!ray) return;
+      const cartesian = viewer.scene.globe.pick(ray, viewer.scene);
+      if (cartesian) {
+        const carto = Cesium.Cartographic.fromCartesian(cartesian);
+        const targetHeight = Math.max(1500, viewer.camera.positionCartographic.height * 0.45);
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromRadians(
+            carto.longitude,
+            carto.latitude,
+            targetHeight
+          ),
+          duration: 1.0,
+        });
+      }
+    }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
     // Initial Camera Position: Focused view of Atlantic & European flight tracks (9,000 km altitude)
     viewer.camera.setView({
@@ -307,6 +351,10 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     }
 
     return () => {
+      viewer.scene.canvas.removeEventListener('wheel', onCanvasWheel);
+      if (doubleClickHandler && !doubleClickHandler.isDestroyed()) {
+        doubleClickHandler.destroy();
+      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }

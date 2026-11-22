@@ -13,7 +13,7 @@ export class LiveTrafficService {
     this.isFetching = true;
 
     try {
-      const res = await fetch('/api/aircraft/live?limit=800');
+      const res = await fetch('/api/aircraft/live?limit=1200');
       if (!res.ok) {
         throw new Error(`Live API responded with status ${res.status}`);
       }

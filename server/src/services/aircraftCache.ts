@@ -1,18 +1,20 @@
-import type { NormalizedAircraft, SystemStatus } from '../../../shared/types.js';
+import type { NormalizedAircraft, SystemStatus, DataSourceType } from '../../../shared/types.js';
 import type { AircraftQueryFilter, OpenSkyResponse } from '../types/providers.js';
 import { OpenSkyAdapter } from '../adapters/openSkyAdapter.js';
+import { FR24Adapter } from '../adapters/fr24Adapter.js';
 
 export class AircraftCacheService {
   private cache: NormalizedAircraft[] = [];
   private cacheMap: Map<string, NormalizedAircraft> = new Map();
   private lastFetchTimestamp = 0;
-  private readonly ttlMs = 12000; // 12 seconds cache TTL to respect OpenSky rate limits
+  private readonly ttlMs = 8000; // 8 seconds cache TTL
   private isFetching = false;
   private fetchPromise: Promise<NormalizedAircraft[]> | null = null;
   private isConnected = true;
+  private activeProvider: DataSourceType = 'fr24';
 
   constructor() {
-    // Populate initial fallback flights immediately so server is never empty on cold start
+    // Populate initial fallback flights so server has data immediately
     this.cache = this.generateFallbackFlights();
     for (const ac of this.cache) {
       this.cacheMap.set(ac.id, ac);
@@ -71,7 +73,7 @@ export class AircraftCacheService {
         );
       }
 
-      const limit = Math.min(filter.limit || 800, 3000);
+      const limit = Math.min(filter.limit || 1200, 3000);
       results = results.slice(0, limit);
     }
 
@@ -79,14 +81,37 @@ export class AircraftCacheService {
   }
 
   /**
-   * Fetches fresh state vectors from OpenSky Network
+   * Multi-Provider Failover Sequence:
+   * 1. Primary: Global Live Feed (FR24 cloud gateway, ~1,500 real flights)
+   * 2. Secondary: OpenSky Network API
+   * 3. Fallback: Retained cache or simulated corridors
    */
   private async fetchFromProvider(): Promise<NormalizedAircraft[]> {
     this.isFetching = true;
 
+    // --- Stage 1: Try Primary Global Live Feed ---
+    try {
+      const liveList = await FR24Adapter.fetchLive(1500);
+      if (liveList && liveList.length > 0) {
+        this.cache = liveList;
+        this.cacheMap.clear();
+        for (const ac of liveList) {
+          this.cacheMap.set(ac.id, ac);
+        }
+        this.lastFetchTimestamp = Date.now();
+        this.isConnected = true;
+        this.activeProvider = 'fr24';
+        console.log(`[AircraftCacheService] Live fleet refreshed: ${liveList.length} real aircraft loaded from primary feed.`);
+        return this.cache;
+      }
+    } catch (primaryErr: any) {
+      console.warn('[AircraftCacheService] Primary feed unavailable, failing over to OpenSky:', primaryErr?.message || primaryErr);
+    }
+
+    // --- Stage 2: Secondary Failover (OpenSky Network) ---
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 9000);
+      const timeout = setTimeout(() => controller.abort(), 8000);
 
       const url = 'https://opensky-network.org/api/states/all';
       const response = await fetch(url, {
@@ -99,35 +124,43 @@ export class AircraftCacheService {
 
       clearTimeout(timeout);
 
-      if (!response.ok) {
-        throw new Error(`OpenSky API error: ${response.status} ${response.statusText}`);
-      }
+      if (response.ok) {
+        const rawData = (await response.json()) as OpenSkyResponse;
+        const normalized = OpenSkyAdapter.normalize(rawData);
 
-      const rawData = (await response.json()) as OpenSkyResponse;
-      const normalized = OpenSkyAdapter.normalize(rawData);
-
-      if (normalized.length > 0) {
-        this.cache = normalized;
-        this.cacheMap.clear();
-        for (const ac of normalized) {
-          this.cacheMap.set(ac.id, ac);
+        if (normalized.length > 0) {
+          this.cache = normalized;
+          this.cacheMap.clear();
+          for (const ac of normalized) {
+            this.cacheMap.set(ac.id, ac);
+          }
+          this.lastFetchTimestamp = Date.now();
+          this.isConnected = true;
+          this.activeProvider = 'opensky';
+          console.log(`[AircraftCacheService] OpenSky secondary feed refreshed: ${normalized.length} live aircraft loaded.`);
+          return this.cache;
         }
-        this.lastFetchTimestamp = Date.now();
-        this.isConnected = true;
-        console.log(`[AircraftCacheService] Cache refreshed: ${normalized.length} live aircraft loaded.`);
+      } else {
+        console.warn(`[AircraftCacheService] OpenSky returned HTTP ${response.status}`);
       }
-
-      return this.cache;
-    } catch (error) {
-      console.warn('[AircraftCacheService] Failed to fetch live data from OpenSky:', error);
-      this.isConnected = false;
-      // Set timestamp into future for a 20s backoff cooldown to prevent 429 spam
-      this.lastFetchTimestamp = Date.now() + 20000;
-      return this.cache;
-    } finally {
-      this.isFetching = false;
-      this.fetchPromise = null;
+    } catch (openSkyErr: any) {
+      console.warn('[AircraftCacheService] OpenSky secondary failover failed:', openSkyErr?.message || openSkyErr);
     }
+
+    // --- Stage 3: Offline / Retained Fallback ---
+    this.isConnected = false;
+    this.lastFetchTimestamp = Date.now() + 15000; // 15s backoff before next cycle
+
+    // If cache is empty, ensure fallback flights exist
+    if (this.cache.length === 0) {
+      this.cache = this.generateFallbackFlights();
+      for (const ac of this.cache) {
+        this.cacheMap.set(ac.id, ac);
+      }
+      this.activeProvider = 'simulated';
+    }
+
+    return this.cache;
   }
 
   /**
@@ -172,7 +205,6 @@ export class AircraftCacheService {
         const callsign = `${airline.prefix}${flightNum}`;
         const hex = (4000000 + i * 100000 + j * 1000 + count).toString(16);
 
-        // Compute point along track
         const progress = 0.15 + (((i * 13 + j * 17) % 70) / 100);
         const lat = origin.lat + (dest.lat - origin.lat) * progress;
         const lon = origin.lon + (dest.lon - origin.lon) * progress;
@@ -180,7 +212,6 @@ export class AircraftCacheService {
         const altM = altFt / 3.28084;
         const speedKts = 460 + ((i * 7 + j * 11) % 50);
 
-        // Heading towards destination
         const dLon = dest.lon - origin.lon;
         const dLat = dest.lat - origin.lat;
         const heading = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
@@ -209,8 +240,8 @@ export class AircraftCacheService {
           },
           lastSeenSecAgo: 1,
           lastUpdateTimestamp: Date.now(),
-          source: 'opensky',
-          isSimulated: false,
+          source: 'simulated',
+          isSimulated: true,
         });
 
         count++;
@@ -237,7 +268,7 @@ export class AircraftCacheService {
       totalAircraftCount: this.cache.length,
       liveAircraftCount: this.cache.filter((a) => !a.isSimulated).length,
       simulatedAircraftCount: this.cache.filter((a) => a.isSimulated).length,
-      activeProvider: 'opensky',
+      activeProvider: this.activeProvider,
       lastProviderFetchTimestamp: this.lastFetchTimestamp,
       isProviderConnected: this.isConnected,
       cacheTtlSeconds: Math.round(this.ttlMs / 1000),
