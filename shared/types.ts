@@ -33,6 +33,16 @@ export interface AircraftMovement {
   rollAngle?: number | null; // Roll angle in degrees if available
 }
 
+export interface FlightRouteInfo {
+  originCode: string;
+  originCity: string;
+  originPosition: { latitude: number; longitude: number };
+  destinationCode: string;
+  destinationCity: string;
+  destinationPosition: { latitude: number; longitude: number };
+  progress: number; // 0.0 to 1.0
+}
+
 export interface NormalizedAircraft {
   id: string; // Mode-S 24-bit hex code (e.g., "4ca123")
   callsign: string | null; // Flight callsign (e.g., "BAW123")
@@ -44,6 +54,7 @@ export interface NormalizedAircraft {
   emergency: EmergencyStatus;
   position: AircraftPosition;
   movement: AircraftMovement;
+  route?: FlightRouteInfo | null; // Origin, destination & great-circle route
   lastSeenSecAgo: number; // Seconds since last message received
   lastUpdateTimestamp: number; // Unix epoch ms
   source: DataSourceType;

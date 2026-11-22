@@ -2,6 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useGlobeStore, type ImageryLayerType } from '../../store/globeStore';
+import { useAircraftStore } from '../../store/aircraftStore';
+import { AircraftLayer } from './AircraftLayer';
+import { FlightPathLayer } from './FlightPathLayer';
+import { SimulatedTrafficGenerator } from '../../services/simulatedTraffic';
 
 // Explicitly set Cesium base URL for static assets/workers and suppress Ion warnings
 (Cesium.buildModuleUrl as any).setBaseUrl('/cesium/');
@@ -55,13 +59,20 @@ const loadImageryProvider = async (type: ImageryLayerType): Promise<Cesium.Image
 export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
+  const aircraftLayerRef = useRef<AircraftLayer | null>(null);
+  const flightPathLayerRef = useRef<FlightPathLayer | null>(null);
+  const simTrafficRef = useRef<SimulatedTrafficGenerator | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(performance.now());
+  const wasFollowingRef = useRef<boolean>(false);
 
   const imageryLayer = useGlobeStore((s) => s.imageryLayer);
   const enableLighting = useGlobeStore((s) => s.enableLighting);
   const showAtmosphere = useGlobeStore((s) => s.showAtmosphere);
+  const showFlightPaths = useGlobeStore((s) => s.showFlightPaths);
   const selectedHub = useGlobeStore((s) => s.selectedHub);
 
-  // Initialize Cesium Viewer
+  // Initialize Cesium Viewer, Aircraft Layer & Flight Path Layer
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -91,6 +102,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     });
 
     viewerRef.current = viewer;
+    (window as any).__viewer = viewer;
 
     // Load initial imagery
     loadImageryProvider(imageryLayer).then((provider) => {
@@ -111,34 +123,110 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     globe.depthTestAgainstTerrain = false;
     scene.backgroundColor = Cesium.Color.fromCssColorString('#02040a');
 
-    // Smooth camera inertia & limits
+    // Smooth camera limits
     scene.screenSpaceCameraController.enableCollisionDetection = true;
-    scene.screenSpaceCameraController.minimumZoomDistance = 500; // 500m
-    scene.screenSpaceCameraController.maximumZoomDistance = 45000000; // 45,000km
+    scene.screenSpaceCameraController.minimumZoomDistance = 500;
+    scene.screenSpaceCameraController.maximumZoomDistance = 45000000;
 
-    // Initial Camera Position: High orbit over Europe / Atlantic / Africa
+    // Initial Camera Position: Focused view of Atlantic & European flight tracks (9,000 km altitude)
     viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(10.0, 25.0, 22000000),
+      destination: Cesium.Cartesian3.fromDegrees(-15.0, 48.0, 9000000),
       orientation: {
         heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-90),
+        pitch: Cesium.Math.toRadians(-88),
         roll: 0,
       },
     });
 
+    // Initialize Aircraft Layer
+    const aircraftLayer = new AircraftLayer(viewer, (id) => {
+      useAircraftStore.getState().selectAircraft(id);
+    });
+    aircraftLayerRef.current = aircraftLayer;
+    (window as any).__aircraftLayer = aircraftLayer;
+
+    // Initialize Dotted Flight Path Layer
+    const flightPathLayer = new FlightPathLayer(viewer);
+    flightPathLayerRef.current = flightPathLayer;
+    (window as any).__flightPathLayer = flightPathLayer;
+
+    // Initialize Simulation Engine
+    const simTraffic = new SimulatedTrafficGenerator();
+    simTrafficRef.current = simTraffic;
+
+    // Initial populate
+    const initialList = simTraffic.update(0);
+    useAircraftStore.getState().setAircraftList(initialList);
+    aircraftLayer.update(initialList, null);
+    flightPathLayer.update(initialList, null, useGlobeStore.getState().showFlightPaths);
+
+    // Animation Loop: updates aircraft position, dotted paths & camera follow
+    const loop = (currentTime: number) => {
+      if (!viewerRef.current || viewerRef.current.isDestroyed()) return;
+
+      const deltaSeconds = Math.min((currentTime - lastTimeRef.current) / 1000, 0.1);
+      lastTimeRef.current = currentTime;
+
+      const updatedList = simTraffic.update(deltaSeconds);
+      const currentSelectedId = useAircraftStore.getState().selectedAircraftId;
+      const followingActive = useAircraftStore.getState().isFollowing;
+      const pathsEnabled = useGlobeStore.getState().showFlightPaths;
+
+      useAircraftStore.getState().setAircraftList(updatedList);
+      aircraftLayer.update(updatedList, currentSelectedId);
+      flightPathLayer.update(updatedList, currentSelectedId, pathsEnabled);
+
+      // Camera Follow tracking logic
+      if (followingActive && currentSelectedId) {
+        const targetAircraft = updatedList.find((ac) => ac.id === currentSelectedId);
+        if (targetAircraft) {
+          const targetPos = Cesium.Cartesian3.fromDegrees(
+            targetAircraft.position.longitude,
+            targetAircraft.position.latitude,
+            targetAircraft.position.altitudeMeters
+          );
+
+          viewer.camera.lookAt(
+            targetPos,
+            new Cesium.HeadingPitchRange(
+              Cesium.Math.toRadians(targetAircraft.movement.heading - 180),
+              Cesium.Math.toRadians(-35),
+              65000
+            )
+          );
+          wasFollowingRef.current = true;
+        }
+      } else if (wasFollowingRef.current) {
+        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+        wasFollowingRef.current = false;
+      }
+
+      animationFrameRef.current = requestAnimationFrame(loop);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(loop);
+
     const handle: CesiumGlobeHandle = {
       flyToHome: () => {
+        if (wasFollowingRef.current) {
+          viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+          wasFollowingRef.current = false;
+        }
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(10.0, 25.0, 22000000),
+          destination: Cesium.Cartesian3.fromDegrees(-15.0, 48.0, 9000000),
           orientation: {
             heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-90),
+            pitch: Cesium.Math.toRadians(-88),
             roll: 0,
           },
           duration: 2.2,
         });
       },
       flyToHub: (lat: number, lon: number, height = 180000) => {
+        if (wasFollowingRef.current) {
+          viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+          wasFollowingRef.current = false;
+        }
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
           orientation: {
@@ -175,6 +263,15 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     }
 
     return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (aircraftLayerRef.current) {
+        aircraftLayerRef.current.destroy();
+      }
+      if (flightPathLayerRef.current) {
+        flightPathLayerRef.current.destroy();
+      }
       viewer.destroy();
       viewerRef.current = null;
     };
@@ -211,6 +308,11 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed() || !selectedHub) return;
+
+    if (wasFollowingRef.current) {
+      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      wasFollowingRef.current = false;
+    }
 
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(

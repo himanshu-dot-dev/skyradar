@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Radio, Clock, ShieldCheck, Navigation } from 'lucide-react';
+import { Radio, Clock, ShieldCheck, Plane } from 'lucide-react';
 import { useGlobeStore, AVIATION_HUBS, type AviationHub } from '../../store/globeStore';
+import { useAircraftStore } from '../../store/aircraftStore';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
 
 interface HeaderProps {
@@ -11,6 +12,8 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
   const [utcTime, setUtcTime] = useState<string>('');
   const selectedHub = useGlobeStore((s) => s.selectedHub);
   const selectHub = useGlobeStore((s) => s.selectHub);
+  const totalCount = useAircraftStore((s) => s.totalCount);
+  const isSimulatedMode = useAircraftStore((s) => s.isSimulatedMode);
 
   // Live UTC Clock for aviation standards (ZULU time)
   useEffect(() => {
@@ -78,9 +81,23 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
           }}
         />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 12 }}>
-          <Radio size={14} color="var(--accent-cyan)" />
-          <span>3D Flight Radar</span>
+        {/* Live Aircraft Count Indicator */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            color: 'var(--accent-cyan)',
+            backgroundColor: 'rgba(0, 240, 255, 0.08)',
+            padding: '4px 10px',
+            borderRadius: 6,
+            border: '1px solid var(--border-cyan)',
+            fontSize: 12,
+            fontFamily: 'var(--font-mono)',
+          }}
+        >
+          <Plane size={14} />
+          <span>{totalCount} TRACKED</span>
         </div>
       </div>
 
@@ -106,8 +123,28 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
         ))}
       </div>
 
-      {/* UTC Clock & System Status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      {/* Mode Indicator & UTC Clock */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* Simulation / Live Badge */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            color: isSimulatedMode ? 'var(--accent-amber)' : 'var(--accent-emerald)',
+            backgroundColor: isSimulatedMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+            padding: '4px 10px',
+            borderRadius: 6,
+            border: `1px solid ${isSimulatedMode ? 'rgba(245, 158, 11, 0.35)' : 'rgba(16, 185, 129, 0.35)'}`,
+          }}
+        >
+          <Radio size={12} />
+          <span>{isSimulatedMode ? 'SIMULATED DATA' : 'LIVE ADS-B'}</span>
+        </div>
+
+        {/* UTC Clock */}
         <div
           style={{
             display: 'flex',
@@ -123,23 +160,6 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
           <span className="font-mono" style={{ fontSize: 12, fontWeight: 500, color: 'var(--accent-cyan)' }}>
             {utcTime}
           </span>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 11,
-            color: 'var(--accent-emerald)',
-            backgroundColor: 'rgba(16, 185, 129, 0.12)',
-            padding: '4px 10px',
-            borderRadius: 6,
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-          }}
-        >
-          <ShieldCheck size={13} />
-          <span>PHASE 1 ACTIVE</span>
         </div>
       </div>
     </header>

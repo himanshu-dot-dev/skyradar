@@ -28,10 +28,12 @@ interface GlobeState {
   imageryLayer: ImageryLayerType;
   enableLighting: boolean;
   showAtmosphere: boolean;
+  showFlightPaths: boolean;
   selectedHub: AviationHub | null;
   setImageryLayer: (layer: ImageryLayerType) => void;
   toggleLighting: () => void;
   toggleAtmosphere: () => void;
+  toggleFlightPaths: () => void;
   selectHub: (hub: AviationHub | null) => void;
 }
 
@@ -39,9 +41,11 @@ export const useGlobeStore = create<GlobeState>((set) => ({
   imageryLayer: 'blue-marble',
   enableLighting: false,
   showAtmosphere: true,
+  showFlightPaths: true,
   selectedHub: null,
   setImageryLayer: (layer) => set({ imageryLayer: layer }),
   toggleLighting: () => set((state) => ({ enableLighting: !state.enableLighting })),
   toggleAtmosphere: () => set((state) => ({ showAtmosphere: !state.showAtmosphere })),
+  toggleFlightPaths: () => set((state) => ({ showFlightPaths: !state.showFlightPaths })),
   selectHub: (hub) => set({ selectedHub: hub }),
 }));
