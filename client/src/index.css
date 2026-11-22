@@ -61,6 +61,11 @@ html, body, #root {
   bottom: 8px !important;
 }
 
+.cesium-credit-logoContainer,
+.cesium-widget-credits .cesium-credit-image {
+  display: none !important;
+}
+
 .cesium-viewer .cesium-widget-credits:hover {
   opacity: 0.95;
 }

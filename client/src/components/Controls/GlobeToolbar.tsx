@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Globe,
   Sun,
   Moon,
   Compass,
@@ -9,10 +8,9 @@ import {
   RotateCcw,
   Layers,
   MapPin,
-  ChevronDown,
   Route,
 } from 'lucide-react';
-import { useGlobeStore, AVIATION_HUBS, type ImageryLayerType, type AviationHub } from '../../store/globeStore';
+import { useGlobeStore, AVIATION_HUBS, type AviationHub } from '../../store/globeStore';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
 
 interface GlobeToolbarProps {
@@ -48,13 +46,32 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   };
 
   return (
-    <div style={{ position: 'absolute', right: 20, top: 80, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Primary Navigation Controls */}
-      <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', padding: 6, gap: 6 }}>
+    <div
+      style={{
+        position: 'absolute',
+        right: 20,
+        top: 80,
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Consolidated Glassmorphic Flight Instruments HUD */}
+      <div
+        className="glass-panel"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 6,
+          gap: 6,
+          position: 'relative',
+        }}
+      >
+        {/* Zoom Controls */}
         <button
           className="glass-btn"
           style={{ width: 38, height: 38 }}
-          title="Zoom In"
+          title="Zoom In (or double-click on Earth)"
           onClick={() => globeHandle?.zoomIn()}
         >
           <Plus size={18} />
@@ -63,7 +80,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
         <button
           className="glass-btn"
           style={{ width: 38, height: 38 }}
-          title="Zoom Out"
+          title="Zoom Out (or scroll mouse wheel)"
           onClick={() => globeHandle?.zoomOut()}
         >
           <Minus size={18} />
@@ -72,24 +89,34 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
         <button
           className="glass-btn"
           style={{ width: 38, height: 38 }}
-          title="Reset Global View"
-          onClick={handleResetHome}
-        >
-          <RotateCcw size={18} />
-        </button>
-
-        <button
-          className="glass-btn"
-          style={{ width: 38, height: 38 }}
-          title="Reset Heading (North Up)"
+          title="Reset Orientation (North Up)"
           onClick={() => globeHandle?.resetHeading()}
         >
           <Compass size={18} />
         </button>
-      </div>
 
-      {/* Layer & Visualization Controls */}
-      <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', padding: 6, gap: 6, position: 'relative' }}>
+        <div style={{ height: 1, backgroundColor: 'rgba(0, 240, 255, 0.2)', margin: '2px 4px' }} />
+
+        {/* Flight Trajectory Paths Toggle */}
+        <button
+          className={`glass-btn ${showFlightPaths ? 'active' : ''}`}
+          style={{ width: 38, height: 38 }}
+          title={showFlightPaths ? 'Hide Flight Trajectory Trails' : 'Show Flight Trajectory Trails'}
+          onClick={toggleFlightPaths}
+        >
+          <Route size={18} color={showFlightPaths ? 'var(--accent-cyan)' : 'inherit'} />
+        </button>
+
+        {/* Day / Night Sun Terminator */}
+        <button
+          className={`glass-btn ${enableLighting ? 'active' : ''}`}
+          style={{ width: 38, height: 38 }}
+          title={enableLighting ? 'Disable Sun Terminator (Full Daytime)' : 'Enable Real-Time Sun Terminator (Day/Night Shadow)'}
+          onClick={toggleLighting}
+        >
+          {enableLighting ? <Sun size={18} color="var(--accent-amber)" /> : <Sun size={18} />}
+        </button>
+
         {/* Layer Selector */}
         <button
           className={`glass-btn ${showLayerMenu ? 'active' : ''}`}
@@ -103,13 +130,39 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
           <Layers size={18} />
         </button>
 
+        {/* Major Aviation Hubs Menu */}
+        <button
+          className={`glass-btn ${showHubMenu || selectedHub ? 'active' : ''}`}
+          style={{ width: 38, height: 38 }}
+          title="Teleport to Major Aviation Hub"
+          onClick={() => {
+            setShowHubMenu(!showHubMenu);
+            setShowLayerMenu(false);
+          }}
+        >
+          <MapPin size={18} />
+        </button>
+
+        <div style={{ height: 1, backgroundColor: 'rgba(0, 240, 255, 0.2)', margin: '2px 4px' }} />
+
+        {/* Reset Global Camera Home */}
+        <button
+          className="glass-btn"
+          style={{ width: 38, height: 38 }}
+          title="Reset Global View"
+          onClick={handleResetHome}
+        >
+          <RotateCcw size={17} />
+        </button>
+
+        {/* Popup: Imagery Layers Menu */}
         {showLayerMenu && (
           <div
             className="glass-panel"
             style={{
               position: 'absolute',
               right: 50,
-              top: 0,
+              top: 140,
               width: 210,
               padding: 10,
               display: 'flex',
@@ -129,7 +182,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
                 setShowLayerMenu(false);
               }}
             >
-              <Globe size={15} />
+              <Sun size={15} />
               <span>NASA Blue Marble</span>
             </button>
 
@@ -154,51 +207,19 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
               }}
             >
               <Layers size={15} />
-              <span>Natural Earth II (Offline)</span>
+              <span>Natural Earth II</span>
             </button>
           </div>
         )}
 
-        {/* Flight Trajectory Paths Toggle */}
-        <button
-          className={`glass-btn ${showFlightPaths ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title={showFlightPaths ? 'Hide Flight Trajectory Trails' : 'Show Flight Trajectory Trails'}
-          onClick={toggleFlightPaths}
-        >
-          <Route size={18} color={showFlightPaths ? 'var(--accent-cyan)' : 'inherit'} />
-        </button>
-
-        {/* Day / Night Sun Terminator */}
-        <button
-          className={`glass-btn ${enableLighting ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title={enableLighting ? 'Disable Sun Lighting (Full Illumination)' : 'Enable Real-Time Sun Lighting (Day/Night Terminator)'}
-          onClick={toggleLighting}
-        >
-          {enableLighting ? <Sun size={18} color="var(--accent-amber)" /> : <Sun size={18} />}
-        </button>
-
-        {/* Aviation Hubs Teleport Menu */}
-        <button
-          className={`glass-btn ${showHubMenu || selectedHub ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title="Teleport to Major Aviation Hub"
-          onClick={() => {
-            setShowHubMenu(!showHubMenu);
-            setShowLayerMenu(false);
-          }}
-        >
-          <MapPin size={18} />
-        </button>
-
+        {/* Popup: Aviation Hubs Menu */}
         {showHubMenu && (
           <div
             className="glass-panel"
             style={{
               position: 'absolute',
               right: 50,
-              top: 50,
+              top: 180,
               width: 250,
               maxHeight: 380,
               overflowY: 'auto',

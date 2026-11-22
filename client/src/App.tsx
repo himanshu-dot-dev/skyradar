@@ -31,44 +31,6 @@ export const App: React.FC = () => {
 
       {/* Selected Aircraft Telemetry Inspector Card */}
       <AircraftTelemetryCard globeHandle={globeHandle} />
-
-      {/* Bottom Status / Navigation Hints */}
-      <div
-        className="glass-panel"
-        style={{
-          position: 'absolute',
-          bottom: 14,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 10,
-          padding: '6px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          fontSize: 11,
-          color: 'var(--text-secondary)',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Navigation size={13} color="var(--accent-cyan)" />
-          <span>
-            <strong style={{ color: 'var(--text-primary)' }}>Left Drag:</strong> Rotate |{' '}
-            <strong style={{ color: 'var(--text-primary)' }}>Scroll / Right Drag:</strong> Zoom |{' '}
-            <strong style={{ color: 'var(--text-primary)' }}>Double Click:</strong> Zoom In |{' '}
-            <strong style={{ color: 'var(--text-primary)' }}>Middle Drag:</strong> Tilt
-          </span>
-        </div>
-
-        <div style={{ height: 12, width: 1, backgroundColor: 'var(--border-cyan)' }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Plane size={13} color="var(--accent-cyan)" />
-          <span>
-            <strong style={{ color: 'var(--text-primary)' }}>Click an aircraft</strong> to inspect telemetry & follow
-          </span>
-        </div>
-      </div>
     </div>
   );
 };

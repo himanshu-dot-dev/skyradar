@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Radio, Clock, ShieldCheck, Plane, Search } from 'lucide-react';
-import { useGlobeStore, AVIATION_HUBS, type AviationHub } from '../../store/globeStore';
+import { Clock, Plane, Search, Radio } from 'lucide-react';
 import { useAircraftStore } from '../../store/aircraftStore';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
 
@@ -8,13 +7,9 @@ interface HeaderProps {
   globeHandle: CesiumGlobeHandle | null;
 }
 
-export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
+export const Header: React.FC<HeaderProps> = () => {
   const [utcTime, setUtcTime] = useState<string>('');
-  const selectedHub = useGlobeStore((s) => s.selectedHub);
-  const selectHub = useGlobeStore((s) => s.selectHub);
   const totalCount = useAircraftStore((s) => s.totalCount);
-  const isSimulatedMode = useAircraftStore((s) => s.isSimulatedMode);
-  const setSimulatedMode = useAircraftStore((s) => s.setSimulatedMode);
   const isDrawerOpen = useAircraftStore((s) => s.isDrawerOpen);
   const toggleDrawer = useAircraftStore((s) => s.toggleDrawer);
 
@@ -22,21 +17,12 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setUtcTime(
-        now.toISOString().substring(11, 19) + ' UTC'
-      );
+      setUtcTime(now.toISOString().substring(11, 19) + ' UTC');
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const handleHubClick = (hub: AviationHub) => {
-    selectHub(hub);
-    if (globeHandle) {
-      globeHandle.flyToHub(hub.latitude, hub.longitude, hub.cameraHeight);
-    }
-  };
 
   return (
     <header
@@ -55,13 +41,13 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
         border: '1px solid var(--border-cyan)',
       }}
     >
-      {/* Brand Identity */}
+      {/* Brand Identity & Live Fleet Toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div className="radar-indicator" />
           <h1
             style={{
-              fontSize: 19,
+              fontSize: 18,
               fontWeight: 700,
               letterSpacing: 1.4,
               color: 'var(--text-primary)',
@@ -84,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
           }}
         />
 
-        {/* Directory & Radar Drawer Toggle */}
+        {/* Unified Flight Directory & Count Badge */}
         <button
           className={`glass-btn ${isDrawerOpen ? 'active' : ''}`}
           style={{
@@ -92,103 +78,50 @@ export const Header: React.FC<HeaderProps> = ({ globeHandle }) => {
             alignItems: 'center',
             gap: 7,
             padding: '5px 12px',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 0.6,
-          }}
-          title="Toggle Flight Directory & Search Filters"
-          onClick={toggleDrawer}
-        >
-          <Search size={13} color="var(--accent-cyan)" />
-          <span>DIRECTORY</span>
-        </button>
-
-        {/* Live Aircraft Count Indicator (clickable to toggle drawer) */}
-        <button
-          className="glass-btn"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            color: isSimulatedMode ? 'var(--accent-amber)' : 'var(--accent-cyan)',
-            backgroundColor: isSimulatedMode ? 'rgba(245, 158, 11, 0.08)' : 'rgba(0, 240, 255, 0.08)',
-            padding: '4px 10px',
-            borderRadius: 6,
-            border: `1px solid ${isSimulatedMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-cyan)'}`,
             fontSize: 12,
             fontFamily: 'var(--font-mono)',
             fontWeight: 600,
             cursor: 'pointer',
           }}
-          title="Click to toggle Flight Directory"
+          title="Click to toggle Flight Directory & Filters"
           onClick={toggleDrawer}
         >
-          <Plane size={14} />
-          <span>{totalCount > 0 ? `${totalCount} ${isSimulatedMode ? 'SIMULATED' : 'LIVE FLIGHTS'}` : 'FETCHING LIVE FLEET...'}</span>
+          <Plane size={14} color="var(--accent-cyan)" />
+          <span>{totalCount > 0 ? `${totalCount.toLocaleString()} LIVE FLIGHTS` : 'RADAR ACTIVE'}</span>
         </button>
       </div>
 
-      {/* Quick Hub Airport Shortcuts */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-          Aviation Hubs:
-        </span>
-        {AVIATION_HUBS.slice(0, 5).map((hub) => (
-          <button
-            key={hub.id}
-            className={`glass-btn ${selectedHub?.id === hub.id ? 'active' : ''}`}
-            style={{
-              padding: '3px 8px',
-              fontSize: 11,
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 600,
-            }}
-            onClick={() => handleHubClick(hub)}
-          >
-            {hub.code}
-          </button>
-        ))}
-      </div>
-
-      {/* Mode Indicator & UTC Clock */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        {/* Simulation / Live Interactive Toggle Button */}
-        <button
-          className="glass-btn"
+      {/* Right: Live Radar Status & UTC Time */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Live Signal Indicator */}
+        <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 7,
+            gap: 6,
             fontSize: 11,
-            fontWeight: 700,
+            fontWeight: 600,
             letterSpacing: 0.5,
-            cursor: 'pointer',
-            color: isSimulatedMode ? 'var(--accent-amber)' : 'var(--accent-emerald)',
-            backgroundColor: isSimulatedMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-            padding: '5px 12px',
+            color: 'var(--accent-emerald)',
+            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+            padding: '4px 10px',
             borderRadius: 6,
-            border: `1px solid ${isSimulatedMode ? 'rgba(245, 158, 11, 0.45)' : 'rgba(16, 185, 129, 0.45)'}`,
-            boxShadow: isSimulatedMode ? 'none' : '0 0 12px rgba(16, 185, 129, 0.3)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
           }}
-          title={isSimulatedMode ? 'Click to switch to LIVE ADS-B real-world flights' : 'Click to switch to SIMULATED worldwide corridors'}
-          onClick={() => setSimulatedMode(!isSimulatedMode)}
         >
-          <Radio size={13} />
-          <span>{isSimulatedMode ? 'SIMULATED DEMO' : 'LIVE ADS-B'}</span>
           <span
             style={{
-              fontSize: 9,
-              textTransform: 'uppercase',
-              backgroundColor: isSimulatedMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(16, 185, 129, 0.25)',
-              padding: '1px 5px',
-              borderRadius: 4,
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              backgroundColor: 'var(--accent-emerald)',
+              boxShadow: '0 0 6px var(--accent-emerald)',
             }}
-          >
-            {isSimulatedMode ? 'CLICK FOR LIVE' : 'ONLINE'}
-          </span>
-        </button>
+          />
+          <span>LIVE RADAR</span>
+        </div>
 
-        {/* UTC Clock */}
+        {/* UTC Aviation Clock */}
         <div
           style={{
             display: 'flex',

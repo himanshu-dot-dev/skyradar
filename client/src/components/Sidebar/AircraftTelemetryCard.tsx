@@ -143,7 +143,7 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
               LIVE RADAR
             </span>
           </div>
-          <span style={{ color: 'var(--text-muted)' }}>OpenSky Network (ADS-B)</span>
+          <span style={{ color: 'var(--text-muted)' }}>LIVE ADS-B</span>
         </div>
       )}
 
@@ -262,68 +262,31 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
       ) : (
         <div
           style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            padding: '12px',
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            padding: '10px 14px',
             borderRadius: 6,
             border: '1px solid var(--border-cyan)',
             display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <Navigation size={16} color="var(--accent-cyan)" />
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 10, color: 'var(--accent-emerald)', fontWeight: 600 }}>ORIGIN</span>
-                <span className="font-mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {compassText}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                Past Trail
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Heading</div>
+              <div className="font-mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {movement.heading}° {compassText}
               </div>
             </div>
+          </div>
 
-            <div style={{ flex: 1, padding: '0 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: '100%', position: 'relative', height: 16, display: 'flex', alignItems: 'center' }}>
-                <div
-                  style={{
-                    width: '100%',
-                    height: 2,
-                    background: 'repeating-linear-gradient(90deg, rgba(0, 240, 255, 0.4), rgba(0, 240, 255, 0.4) 4px, transparent 4px, transparent 8px)',
-                  }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    transform: 'translate(-50%, 0)',
-                    color: 'var(--accent-cyan)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    filter: 'drop-shadow(0 0 6px rgba(0, 240, 255, 0.8))',
-                  }}
-                >
-                  <Plane size={15} style={{ transform: 'rotate(90deg)' }} />
-                </div>
-              </div>
+          <div style={{ height: 24, width: 1, backgroundColor: 'rgba(0, 240, 255, 0.2)' }} />
 
-              <span className="font-mono" style={{ fontSize: 10, color: 'var(--accent-cyan)', fontWeight: 600 }}>
-                ACTIVE VECTOR • {movement.speedKnots} KTS
-              </span>
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                <span className="font-mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {movement.heading}°
-                </span>
-                <span style={{ fontSize: 10, color: 'var(--accent-amber)', fontWeight: 600 }}>HDG</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                Projected
-              </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ground Track</div>
+            <div className="font-mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-cyan)' }}>
+              {movement.speedKnots} KTS
             </div>
           </div>
         </div>
