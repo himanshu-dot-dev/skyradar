@@ -108,6 +108,10 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     viewerRef.current = viewer;
     (window as any).__viewer = viewer;
 
+    // Support High-DPI / Retina displays for razor-sharp typography and textures
+    viewer.useBrowserRecommendedResolution = false;
+    viewer.resolutionScale = Math.min(2.0, window.devicePixelRatio || 1.0);
+
     // Load initial imagery
     loadImageryProvider(imageryLayer).then((provider) => {
       if (viewer && !viewer.isDestroyed()) {

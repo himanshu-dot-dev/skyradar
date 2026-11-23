@@ -5,6 +5,10 @@ interface AircraftBillboard extends Cesium.Billboard {
   _currentTextureKey?: string;
 }
 
+interface AircraftLabel extends Cesium.Label {
+  _isCurrentlySelected?: boolean;
+}
+
 // Pre-render cached commercial airliner canvas data URLs for performance
 const textureCache: Record<string, string> = {};
 
@@ -513,39 +517,75 @@ export class AircraftLayer {
         }
       }
 
-      // --- 2. Callsign Label ---
-      let label = this.labels.get(ac.id);
+      // --- 2. High-Legibility Callsign Radar Label (2x Supersampled) ---
+      let label = this.labels.get(ac.id) as AircraftLabel | undefined;
       const labelText = ac.callsign || ac.id.toUpperCase();
+
+      const labelOffset = isSelected
+        ? new Cesium.Cartesian2(0, 52) // Outside the tactical cyan targeting reticle
+        : new Cesium.Cartesian2(0, 36); // Cleanly below the aircraft tail
+
+      // Distance-based LOD: Only show labels for all flights when camera is within 2,200 km (prevents solid black wall over Europe)
+      // Selected aircraft label is ALWAYS visible at any zoom distance
+      const displayCondition = isSelected
+        ? new Cesium.DistanceDisplayCondition(0, Number.MAX_VALUE)
+        : new Cesium.DistanceDisplayCondition(0, 2200000);
+
+      // Render at 24px/22px and downscale by 0.5 for razor-sharp 2x retina typography
+      const labelFont = isSelected
+        ? '700 24px "JetBrains Mono", monospace'
+        : '600 22px "JetBrains Mono", monospace';
+
+      const labelFillColor = isSelected
+        ? Cesium.Color.fromCssColorString('#00f0ff')
+        : Cesium.Color.WHITE;
+
+      // High-contrast solid dark glass background
+      const labelBgColor = isSelected
+        ? Cesium.Color.fromCssColorString('rgba(2, 6, 23, 0.95)')
+        : Cesium.Color.fromCssColorString('rgba(15, 23, 42, 0.90)');
+
+      const labelPadding = isSelected
+        ? new Cesium.Cartesian2(14, 8)
+        : new Cesium.Cartesian2(12, 6);
 
       if (!label) {
         label = this.labelCollection.add({
           position,
           text: labelText,
-          font: 'bold 11px "JetBrains Mono", ui-monospace, monospace',
-          fillColor: isSelected ? Cesium.Color.fromCssColorString('#00f0ff') : Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 3,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          pixelOffset: new Cesium.Cartesian2(0, isSelected ? 42 : 32),
+          font: labelFont,
+          scale: 0.5,
+          fillColor: labelFillColor,
+          style: Cesium.LabelStyle.FILL, // Pure clean vector fill without choking outline stroke
+          pixelOffset: labelOffset,
+          eyeOffset: new Cesium.Cartesian3(0, 0, -10), // Always render in front of aircraft billboard
           show: isVisible,
           showBackground: true,
-          backgroundColor: isSelected
-            ? Cesium.Color.fromCssColorString('rgba(0, 240, 255, 0.4)')
-            : Cesium.Color.fromCssColorString('rgba(3, 7, 18, 0.85)'),
-          backgroundPadding: new Cesium.Cartesian2(5, 2),
+          backgroundColor: labelBgColor,
+          backgroundPadding: labelPadding,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scaleByDistance: new Cesium.NearFarScalar(1.0e3, 1.1, 1.6e7, 0.75),
+          distanceDisplayCondition: displayCondition,
           id: ac.id,
-        });
+        }) as AircraftLabel;
+        label._isCurrentlySelected = isSelected;
         this.labels.set(ac.id, label);
       } else {
         label.show = isVisible;
         label.position = position;
         if (label.text !== labelText) label.text = labelText;
-        label.fillColor = isSelected ? Cesium.Color.fromCssColorString('#00f0ff') : Cesium.Color.WHITE;
-        label.backgroundColor = isSelected
-          ? Cesium.Color.fromCssColorString('rgba(0, 240, 255, 0.4)')
-          : Cesium.Color.fromCssColorString('rgba(3, 7, 18, 0.85)');
+
+        // ONLY update style, font, colors and offsets when selection state actually changes (prevents 60 FPS texture atlas thrashing)
+        if (label._isCurrentlySelected !== isSelected) {
+          label.font = labelFont;
+          label.scale = 0.5;
+          label.fillColor = labelFillColor;
+          label.style = Cesium.LabelStyle.FILL;
+          label.backgroundColor = labelBgColor;
+          label.backgroundPadding = labelPadding;
+          label.pixelOffset = labelOffset;
+          label.distanceDisplayCondition = displayCondition;
+          label._isCurrentlySelected = isSelected;
+        }
       }
     }
 

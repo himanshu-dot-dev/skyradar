@@ -117,8 +117,8 @@ export class FlightPathLayer {
         futurePositions = this.generateArc(route.originPosition, route.destinationPosition, progress, 1.0, alt, 25);
         originPos = Cesium.Cartesian3.fromDegrees(route.originPosition.longitude, route.originPosition.latitude, 300);
         destPos = Cesium.Cartesian3.fromDegrees(route.destinationPosition.longitude, route.destinationPosition.latitude, 300);
-        depBadgeText = `🛫 DEP: ${route.originCode} (${route.originCity})`;
-        arrBadgeText = `🛬 ARR: ${route.destinationCode} (${route.destinationCity})`;
+        depBadgeText = `DEP: ${route.originCode} (${route.originCity})`;
+        arrBadgeText = `ARR: ${route.destinationCode} (${route.destinationCity})`;
       } else {
         // Live ADS-B flight: calculate dynamic historical track & projected flight trajectory
         const heading = selectedAircraft.movement.heading;
@@ -135,8 +135,8 @@ export class FlightPathLayer {
         originPos = Cesium.Cartesian3.fromDegrees(pastPt.longitude, pastPt.latitude, 300);
         destPos = Cesium.Cartesian3.fromDegrees(futurePt.longitude, futurePt.latitude, 300);
 
-        depBadgeText = `🛫 PAST TRAIL (${Math.round(trailKm)} km)`;
-        arrBadgeText = `🛬 HDG: ${heading}° (${Math.round(projKm)} km)`;
+        depBadgeText = `TRAIL: ${Math.round(trailKm)} km`;
+        arrBadgeText = `HDG: ${heading}° (${Math.round(projKm)} km)`;
       }
 
       // Past path visibility (origin to current aircraft)
@@ -180,50 +180,52 @@ export class FlightPathLayer {
         this.selectedFuturePolyline.positions = futurePositions;
       }
 
-      // Origin Pin & Label
+      // Origin Pin & Label (2x Supersampled)
       if (!this.originLabel) {
         this.originLabel = this.labelCollection.add({
           position: originPos,
           text: depBadgeText,
-          font: 'bold 12px "JetBrains Mono", monospace',
+          font: '600 24px "JetBrains Mono", monospace',
+          scale: 0.5,
           fillColor: Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 3,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          style: Cesium.LabelStyle.FILL,
           show: isOriginVisible,
           showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString('rgba(16, 185, 129, 0.85)'),
-          backgroundPadding: new Cesium.Cartesian2(6, 4),
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(16, 185, 129, 0.95)'),
+          backgroundPadding: new Cesium.Cartesian2(16, 8),
           pixelOffset: new Cesium.Cartesian2(0, -22),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         });
       } else {
         this.originLabel.show = isOriginVisible;
         this.originLabel.position = originPos;
-        this.originLabel.text = depBadgeText;
+        if (this.originLabel.text !== depBadgeText) {
+          this.originLabel.text = depBadgeText;
+        }
       }
 
-      // Destination Pin & Label
+      // Destination Pin & Label (2x Supersampled)
       if (!this.destLabel) {
         this.destLabel = this.labelCollection.add({
           position: destPos,
           text: arrBadgeText,
-          font: 'bold 12px "JetBrains Mono", monospace',
+          font: '600 24px "JetBrains Mono", monospace',
+          scale: 0.5,
           fillColor: Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 3,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          style: Cesium.LabelStyle.FILL,
           show: isDestVisible,
           showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString('rgba(245, 158, 11, 0.85)'),
-          backgroundPadding: new Cesium.Cartesian2(6, 4),
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(217, 119, 6, 0.95)'),
+          backgroundPadding: new Cesium.Cartesian2(16, 8),
           pixelOffset: new Cesium.Cartesian2(0, -22),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         });
       } else {
         this.destLabel.show = isDestVisible;
         this.destLabel.position = destPos;
-        this.destLabel.text = arrBadgeText;
+        if (this.destLabel.text !== arrBadgeText) {
+          this.destLabel.text = arrBadgeText;
+        }
       }
 
       // Ground radar beacons at endpoints
