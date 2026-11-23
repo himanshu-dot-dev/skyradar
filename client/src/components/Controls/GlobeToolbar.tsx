@@ -9,6 +9,7 @@ import {
   Layers,
   MapPin,
   Route,
+  CloudRain,
 } from 'lucide-react';
 import { useGlobeStore, AVIATION_HUBS, type AviationHub } from '../../store/globeStore';
 import { useAircraftStore } from '../../store/aircraftStore';
@@ -28,10 +29,13 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   const imageryLayer = useGlobeStore((s) => s.imageryLayer);
   const enableLighting = useGlobeStore((s) => s.enableLighting);
   const showFlightPaths = useGlobeStore((s) => s.showFlightPaths);
+  const showWeatherRadar = useGlobeStore((s) => s.showWeatherRadar);
+  const activeWeatherProvider = useGlobeStore((s) => s.activeWeatherProvider);
   const selectedHub = useGlobeStore((s) => s.selectedHub);
   const setImageryLayer = useGlobeStore((s) => s.setImageryLayer);
   const toggleLighting = useGlobeStore((s) => s.toggleLighting);
   const toggleFlightPaths = useGlobeStore((s) => s.toggleFlightPaths);
+  const toggleWeatherRadar = useGlobeStore((s) => s.toggleWeatherRadar);
   const selectHub = useGlobeStore((s) => s.selectHub);
   const selectedAircraft = useAircraftStore((s) => s.selectedAircraft);
 
@@ -81,6 +85,16 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
       }
     } else {
       showToast('🔀 Trajectory Trails Disabled');
+    }
+  };
+
+  const handleToggleWeather = () => {
+    const nextState = !showWeatherRadar;
+    toggleWeatherRadar();
+    if (nextState) {
+      showToast('🌧️ Doppler Weather Radar Active: RainViewer with OpenWeather / NASA Failover');
+    } else {
+      showToast('🌧️ Weather Radar Overlay Disabled');
     }
   };
 
@@ -172,6 +186,20 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
           onClick={handleToggleFlightPaths}
         >
           <Route size={18} color={showFlightPaths ? 'var(--accent-cyan)' : 'inherit'} />
+        </button>
+
+        {/* Live Doppler Weather Radar Toggle */}
+        <button
+          className={`glass-btn ${showWeatherRadar ? 'active' : ''}`}
+          style={{ width: 38, height: 38 }}
+          title={
+            showWeatherRadar
+              ? `Live Weather Radar: Enabled (${activeWeatherProvider.toUpperCase()})`
+              : 'Toggle Live Weather Radar (RainViewer Doppler / OpenWeather / NASA GIBS)'
+          }
+          onClick={handleToggleWeather}
+        >
+          <CloudRain size={18} color={showWeatherRadar ? 'var(--accent-cyan)' : 'inherit'} />
         </button>
 
         {/* Tactical HUD Toast Banner for Instruments Feedback */}

@@ -5,6 +5,7 @@ import { useGlobeStore, type ImageryLayerType } from '../../store/globeStore';
 import { useAircraftStore, matchesFilters } from '../../store/aircraftStore';
 import { AircraftLayer } from './AircraftLayer';
 import { FlightPathLayer } from './FlightPathLayer';
+import { WeatherRadarLayer, type WeatherProviderType } from './WeatherRadarLayer';
 import { SimulatedTrafficGenerator } from '../../services/simulatedTraffic';
 import { LiveTrafficService } from '../../services/liveTraffic';
 import type { NormalizedAircraft } from '@shared/types';
@@ -19,6 +20,10 @@ export interface CesiumGlobeHandle {
   zoomIn: () => void;
   zoomOut: () => void;
   resetHeading: () => void;
+  setWeatherVisible: (
+    show: boolean,
+    onStatusChange?: (provider: WeatherProviderType, label: string) => void
+  ) => Promise<void>;
   getViewer: () => Cesium.Viewer | null;
 }
 
@@ -63,6 +68,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const aircraftLayerRef = useRef<AircraftLayer | null>(null);
   const flightPathLayerRef = useRef<FlightPathLayer | null>(null);
+  const weatherRadarLayerRef = useRef<WeatherRadarLayer | null>(null);
   const simTrafficRef = useRef<SimulatedTrafficGenerator | null>(null);
   const liveTrafficRef = useRef<LiveTrafficService | null>(null);
   const lastLivePollRef = useRef<number>(0);
@@ -138,28 +144,105 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     controller.enableZoom = true;
     controller.minimumZoomDistance = 100;
     controller.maximumZoomDistance = 50000000;
-    controller.inertiaZoom = 0.8;
+    controller.inertiaZoom = 0.4;
+    controller.zoomFactor = 10;
 
-    // Enable all mouse zoom modes: Wheel, Trackpad Pinch (Wheel+Ctrl), and Right-Click Drag
+    // Enable gesture modes for drag & touch screen pinch
     controller.zoomEventTypes = [
       Cesium.CameraEventType.RIGHT_DRAG,
-      Cesium.CameraEventType.WHEEL,
       Cesium.CameraEventType.PINCH,
-      {
-        eventType: Cesium.CameraEventType.WHEEL,
-        modifier: Cesium.KeyboardEventModifier.CTRL,
-      },
       {
         eventType: Cesium.CameraEventType.RIGHT_DRAG,
         modifier: Cesium.KeyboardEventModifier.CTRL,
       },
     ];
 
-    // Guarantee mouse wheel events are never swallowed by browser page-scroll defaults
+    // High-performance adaptive wheel, Ctrl+wheel & trackpad pinch zoom accelerator
+    // Anchors zoom directly towards mouse cursor with exponential altitude scaling
     const onCanvasWheel = (e: WheelEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+
+      const isCtrl = e.ctrlKey;
+      const isPixelMode = e.deltaMode === 0;
+      const isContinuous = Math.abs(e.deltaY) < 35 && isPixelMode;
+
+      // Normalize delta across input devices and browsers
+      let rawDelta = e.deltaY;
+      if (e.deltaMode === 1) {
+        rawDelta *= 35; // DOM_DELTA_LINE
+      } else if (e.deltaMode === 2) {
+        rawDelta *= 300; // DOM_DELTA_PAGE
+      }
+
+      if (rawDelta === 0) return;
+
+      // Adaptive zoom factor:
+      // Trackpad pinch (Ctrl+wheel) & continuous two-finger scrolling emit high-frequency (60Hz) small deltas
+      // Discrete physical mouse wheels emit single ~100px notches
+      let factor: number;
+      if (isCtrl || isContinuous) {
+        factor = Math.min(0.25, Math.max(0.02, Math.abs(rawDelta) * 0.016));
+      } else {
+        factor = Math.min(0.30, Math.max(0.12, Math.abs(rawDelta) * 0.0022));
+      }
+
+      const zoomingIn = rawDelta < 0;
+      const height = viewer.camera.positionCartographic.height;
+
+      // Altitude safety boundaries
+      if (zoomingIn && height <= 100) return;
+      if (!zoomingIn && height >= 45000000) return;
+
+      const isTransformed = !Cesium.Matrix4.equals(viewer.camera.transform, Cesium.Matrix4.IDENTITY);
+
+      if (isTransformed) {
+        // Locked transform (e.g. camera follow mode on selected aircraft)
+        const currentDist = Cesium.Cartesian3.magnitude(viewer.camera.position);
+        const zoomDist = Math.max(50, currentDist * factor);
+        if (zoomingIn) {
+          viewer.camera.zoomIn(zoomDist);
+        } else {
+          viewer.camera.zoomOut(zoomDist);
+        }
+        return;
+      }
+
+      // Free globe view: Ray-cast to anchor zoom to the cursor position
+      const rect = viewer.scene.canvas.getBoundingClientRect();
+      const windowPos = new Cesium.Cartesian2(e.clientX - rect.left, e.clientY - rect.top);
+      const ray = viewer.camera.getPickRay(windowPos);
+      let target: Cesium.Cartesian3 | undefined = undefined;
+      if (ray) {
+        target = viewer.scene.globe.pick(ray, viewer.scene);
+      }
+
+      if (target) {
+        const camPos = viewer.camera.positionWC;
+        const dir = Cesium.Cartesian3.subtract(target, camPos, new Cesium.Cartesian3());
+        const dist = Cesium.Cartesian3.magnitude(dir);
+        Cesium.Cartesian3.normalize(dir, dir);
+
+        const moveDist = dist * factor;
+        if (zoomingIn) {
+          const safeDist = Math.min(moveDist, dist - 100);
+          if (safeDist > 0) {
+            viewer.camera.move(dir, safeDist);
+          }
+        } else {
+          viewer.camera.move(dir, -moveDist);
+        }
+      } else {
+        // Space / Horizon fallback: zoom along camera view direction
+        if (zoomingIn) {
+          viewer.camera.zoomIn(height * factor);
+        } else {
+          viewer.camera.zoomOut(height * factor);
+        }
+      }
     };
-    viewer.scene.canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
+
+    viewer.scene.canvas.addEventListener('wheel', onCanvasWheel, { capture: true, passive: false });
 
     // Double-click anywhere on Earth to smoothly zoom in towards the clicked location
     const doubleClickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -202,6 +285,10 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     const flightPathLayer = new FlightPathLayer(viewer);
     flightPathLayerRef.current = flightPathLayer;
     (window as any).__flightPathLayer = flightPathLayer;
+
+    const weatherLayer = new WeatherRadarLayer(viewer);
+    weatherRadarLayerRef.current = weatherLayer;
+    (window as any).__weatherRadarLayer = weatherLayer;
 
     // Initialize Simulation Engine & Live Traffic Service
     const simTraffic = new SimulatedTrafficGenerator();
@@ -348,6 +435,9 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
           duration: 1.0,
         });
       },
+      setWeatherVisible: (show, onStatusChange) => {
+        return weatherLayer.setVisible(show, onStatusChange);
+      },
       getViewer: () => viewer,
     };
 
@@ -356,7 +446,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     }
 
     return () => {
-      viewer.scene.canvas.removeEventListener('wheel', onCanvasWheel);
+      viewer.scene.canvas.removeEventListener('wheel', onCanvasWheel, { capture: true });
       if (doubleClickHandler && !doubleClickHandler.isDestroyed()) {
         doubleClickHandler.destroy();
       }
@@ -368,6 +458,9 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
       }
       if (flightPathLayerRef.current) {
         flightPathLayerRef.current.destroy();
+      }
+      if (weatherRadarLayerRef.current) {
+        weatherRadarLayerRef.current.destroy();
       }
       viewer.destroy();
       viewerRef.current = null;
@@ -425,6 +518,18 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
       duration: 2.5,
     });
   }, [selectedHub]);
+
+  // React to weather radar toggle with multi-provider failover
+  const showWeatherRadar = useGlobeStore((s) => s.showWeatherRadar);
+  const setActiveWeatherProvider = useGlobeStore((s) => s.setActiveWeatherProvider);
+
+  useEffect(() => {
+    if (weatherRadarLayerRef.current) {
+      weatherRadarLayerRef.current.setVisible(showWeatherRadar, (provider) => {
+        setActiveWeatherProvider(provider);
+      });
+    }
+  }, [showWeatherRadar, setActiveWeatherProvider]);
 
   return <div ref={containerRef} className="cesium-viewer-container" />;
 };

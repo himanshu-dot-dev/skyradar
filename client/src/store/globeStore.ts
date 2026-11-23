@@ -29,11 +29,15 @@ interface GlobeState {
   enableLighting: boolean;
   showAtmosphere: boolean;
   showFlightPaths: boolean;
+  showWeatherRadar: boolean;
+  activeWeatherProvider: 'rainviewer' | 'openweathermap' | 'nasa' | 'none';
   selectedHub: AviationHub | null;
   setImageryLayer: (layer: ImageryLayerType) => void;
   toggleLighting: () => void;
   toggleAtmosphere: () => void;
   toggleFlightPaths: () => void;
+  toggleWeatherRadar: () => void;
+  setActiveWeatherProvider: (provider: 'rainviewer' | 'openweathermap' | 'nasa' | 'none') => void;
   selectHub: (hub: AviationHub | null) => void;
 }
 
@@ -42,10 +46,18 @@ export const useGlobeStore = create<GlobeState>((set) => ({
   enableLighting: false,
   showAtmosphere: true,
   showFlightPaths: true,
+  showWeatherRadar: false,
+  activeWeatherProvider: 'none',
   selectedHub: null,
   setImageryLayer: (layer) => set({ imageryLayer: layer }),
   toggleLighting: () => set((state) => ({ enableLighting: !state.enableLighting })),
   toggleAtmosphere: () => set((state) => ({ showAtmosphere: !state.showAtmosphere })),
   toggleFlightPaths: () => set((state) => ({ showFlightPaths: !state.showFlightPaths })),
+  toggleWeatherRadar: () =>
+    set((state) => ({
+      showWeatherRadar: !state.showWeatherRadar,
+      activeWeatherProvider: !state.showWeatherRadar ? 'rainviewer' : 'none',
+    })),
+  setActiveWeatherProvider: (provider) => set({ activeWeatherProvider: provider }),
   selectHub: (hub) => set({ selectedHub: hub }),
 }));
