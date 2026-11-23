@@ -1,5 +1,6 @@
 import type { NormalizedAircraft } from '../../../shared/types.js';
 import { enrichAirline } from '../services/aircraftEnricher.js';
+import { getAirport, calculateFlightProgress } from '../services/airportService.js';
 
 export class FR24Adapter {
   /**
@@ -79,6 +80,32 @@ export class FR24Adapter {
       // Airline operator enrichment
       const { operator } = enrichAirline(callsign);
 
+      // Origin and destination route enrichment (IATA codes in raw[11] and raw[12])
+      const originCode = typeof raw[11] === 'string' && raw[11].trim().length === 3 ? raw[11].trim().toUpperCase() : null;
+      const destCode = typeof raw[12] === 'string' && raw[12].trim().length === 3 ? raw[12].trim().toUpperCase() : null;
+
+      let route: NormalizedAircraft['route'] = null;
+      if (originCode && destCode) {
+        const originAirport = getAirport(originCode);
+        const destAirport = getAirport(destCode);
+        if (originAirport && destAirport) {
+          const progress = calculateFlightProgress(
+            originAirport,
+            destAirport,
+            { latitude: lat, longitude: lon }
+          );
+          route = {
+            originCode,
+            originCity: originAirport.city,
+            originPosition: { latitude: originAirport.lat, longitude: originAirport.lon },
+            destinationCode: destCode,
+            destinationCity: destAirport.city,
+            destinationPosition: { latitude: destAirport.lat, longitude: destAirport.lon },
+            progress,
+          };
+        }
+      }
+
       const aircraft: NormalizedAircraft = {
         id: hex,
         callsign,
@@ -101,6 +128,7 @@ export class FR24Adapter {
           verticalRateFpm: Math.round(verticalRateFpm),
           rollAngle: null,
         },
+        route,
         lastSeenSecAgo: Math.max(0, Math.floor((now - timestampSec * 1000) / 1000)),
         lastUpdateTimestamp: now,
         source: 'fr24',

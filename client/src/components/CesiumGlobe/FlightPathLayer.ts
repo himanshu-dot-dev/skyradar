@@ -79,10 +79,50 @@ export class FlightPathLayer {
     segments = 25
   ): Cesium.Cartesian3[] {
     const coords: Cesium.Cartesian3[] = [];
+    const alt = Math.max(100, altitudeMeters);
     for (let i = 0; i <= segments; i++) {
       const f = startF + (endF - startF) * (i / segments);
       const pt = interpolateGreatCircle(origin, dest, f);
-      coords.push(Cesium.Cartesian3.fromDegrees(pt.longitude, pt.latitude, Math.max(8000, altitudeMeters)));
+      coords.push(Cesium.Cartesian3.fromDegrees(pt.longitude, pt.latitude, alt));
+    }
+    return coords;
+  }
+
+  /**
+   * Generates a smooth great-circle flight trajectory segment between two points with realistic elevation:
+   * isClimb = true: climbs from 300m runway elevation at start to cruiseAlt at end
+   * isClimb = false: cruises at cruiseAlt, then descends to 300m runway elevation at destination
+   */
+  private generateSegmentArc(
+    start: { latitude: number; longitude: number },
+    end: { latitude: number; longitude: number },
+    cruiseAlt: number,
+    isClimb: boolean,
+    segments = 25
+  ): Cesium.Cartesian3[] {
+    const coords: Cesium.Cartesian3[] = [];
+    const minAlt = Math.max(300, cruiseAlt);
+
+    for (let i = 0; i <= segments; i++) {
+      const f = i / segments;
+      const pt = interpolateGreatCircle(start, end, f);
+
+      let pointAlt = minAlt;
+      if (isClimb) {
+        // Climb out from runway (300m) to cruising altitude over the first 25% of the segment
+        const climbWindow = 0.25;
+        if (f < climbWindow) {
+          pointAlt = 300 + (minAlt - 300) * Math.sin((f / climbWindow) * (Math.PI / 2));
+        }
+      } else {
+        // Cruise, then descend from cruising altitude to runway (300m) over the final 25% of the segment
+        const descentWindow = 0.25;
+        if (f > 1.0 - descentWindow) {
+          pointAlt = 300 + (minAlt - 300) * Math.sin(((1.0 - f) / descentWindow) * (Math.PI / 2));
+        }
+      }
+
+      coords.push(Cesium.Cartesian3.fromDegrees(pt.longitude, pt.latitude, pointAlt));
     }
     return coords;
   }
@@ -110,17 +150,30 @@ export class FlightPathLayer {
       let depBadgeText: string;
       let arrBadgeText: string;
 
-      if (selectedAircraft.route) {
+      const hasAirportRoute = Boolean(selectedAircraft.route);
+
+      if (hasAirportRoute && selectedAircraft.route) {
         const route = selectedAircraft.route;
-        const progress = Math.max(0.01, Math.min(0.99, route.progress));
-        pastPositions = this.generateArc(route.originPosition, route.destinationPosition, 0.0, progress, alt, 25);
-        futurePositions = this.generateArc(route.originPosition, route.destinationPosition, progress, 1.0, alt, 25);
+        pastPositions = this.generateSegmentArc(
+          route.originPosition,
+          selectedAircraft.position,
+          alt,
+          true,
+          25
+        );
+        futurePositions = this.generateSegmentArc(
+          selectedAircraft.position,
+          route.destinationPosition,
+          alt,
+          false,
+          25
+        );
         originPos = Cesium.Cartesian3.fromDegrees(route.originPosition.longitude, route.originPosition.latitude, 300);
         destPos = Cesium.Cartesian3.fromDegrees(route.destinationPosition.longitude, route.destinationPosition.latitude, 300);
         depBadgeText = `DEP: ${route.originCode} (${route.originCity})`;
         arrBadgeText = `ARR: ${route.destinationCode} (${route.destinationCity})`;
       } else {
-        // Live ADS-B flight: calculate dynamic historical track & projected flight trajectory
+        // En-route ADS-B flight: Navigation flight vector at CRUISING ALTITUDE (never plunge into the ocean!)
         const heading = selectedAircraft.movement.heading;
         const speed = Math.max(150, selectedAircraft.movement.speedKnots);
         const trailKm = Math.min(250, speed * 0.45);
@@ -132,11 +185,12 @@ export class FlightPathLayer {
         pastPositions = this.generateArc(pastPt, selectedAircraft.position, 0.0, 1.0, alt, 20);
         futurePositions = this.generateArc(selectedAircraft.position, futurePt, 0.0, 1.0, alt, 20);
 
-        originPos = Cesium.Cartesian3.fromDegrees(pastPt.longitude, pastPt.latitude, 300);
-        destPos = Cesium.Cartesian3.fromDegrees(futurePt.longitude, futurePt.latitude, 300);
+        // Keep positions at flight cruising altitude (never drop to 300m in the sea)
+        originPos = Cesium.Cartesian3.fromDegrees(pastPt.longitude, pastPt.latitude, alt);
+        destPos = Cesium.Cartesian3.fromDegrees(futurePt.longitude, futurePt.latitude, alt);
 
-        depBadgeText = `TRAIL: ${Math.round(trailKm)} km`;
-        arrBadgeText = `HDG: ${heading}° (${Math.round(projKm)} km)`;
+        depBadgeText = '';
+        arrBadgeText = `VECTOR: HDG ${heading}° (${speed} kts)`;
       }
 
       // Past path visibility (origin to current aircraft)
@@ -180,42 +234,48 @@ export class FlightPathLayer {
         this.selectedFuturePolyline.positions = futurePositions;
       }
 
-      // Origin Pin & Label (2x Supersampled)
-      if (!this.originLabel) {
-        this.originLabel = this.labelCollection.add({
-          position: originPos,
-          text: depBadgeText,
-          font: '600 24px "JetBrains Mono", monospace',
-          scale: 0.5,
-          fillColor: Cesium.Color.WHITE,
-          style: Cesium.LabelStyle.FILL,
-          show: isOriginVisible,
-          showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString('rgba(16, 185, 129, 0.95)'),
-          backgroundPadding: new Cesium.Cartesian2(16, 8),
-          pixelOffset: new Cesium.Cartesian2(0, -22),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        });
-      } else {
-        this.originLabel.show = isOriginVisible;
-        this.originLabel.position = originPos;
-        if (this.originLabel.text !== depBadgeText) {
-          this.originLabel.text = depBadgeText;
+      // Origin Pin & Label (ONLY shown for authentic airport routes on land!)
+      if (hasAirportRoute) {
+        if (!this.originLabel) {
+          this.originLabel = this.labelCollection.add({
+            position: originPos,
+            text: depBadgeText,
+            font: '600 24px "JetBrains Mono", monospace',
+            scale: 0.5,
+            fillColor: Cesium.Color.WHITE,
+            style: Cesium.LabelStyle.FILL,
+            show: isOriginVisible,
+            showBackground: true,
+            backgroundColor: Cesium.Color.fromCssColorString('rgba(16, 185, 129, 0.95)'),
+            backgroundPadding: new Cesium.Cartesian2(16, 8),
+            pixelOffset: new Cesium.Cartesian2(0, -22),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          });
+        } else {
+          this.originLabel.show = isOriginVisible;
+          this.originLabel.position = originPos;
+          if (this.originLabel.text !== depBadgeText) {
+            this.originLabel.text = depBadgeText;
+          }
         }
+      } else if (this.originLabel) {
+        this.originLabel.show = false;
       }
 
-      // Destination Pin & Label (2x Supersampled)
+      // Destination / Forward Vector Pin & Label (2x Supersampled)
       if (!this.destLabel) {
         this.destLabel = this.labelCollection.add({
           position: destPos,
           text: arrBadgeText,
           font: '600 24px "JetBrains Mono", monospace',
           scale: 0.5,
-          fillColor: Cesium.Color.WHITE,
+          fillColor: hasAirportRoute ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#38bdf8'),
           style: Cesium.LabelStyle.FILL,
           show: isDestVisible,
           showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString('rgba(217, 119, 6, 0.95)'),
+          backgroundColor: hasAirportRoute
+            ? Cesium.Color.fromCssColorString('rgba(217, 119, 6, 0.95)')
+            : Cesium.Color.fromCssColorString('rgba(8, 15, 30, 0.92)'),
           backgroundPadding: new Cesium.Cartesian2(16, 8),
           pixelOffset: new Cesium.Cartesian2(0, -22),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -226,33 +286,42 @@ export class FlightPathLayer {
         if (this.destLabel.text !== arrBadgeText) {
           this.destLabel.text = arrBadgeText;
         }
+        this.destLabel.fillColor = hasAirportRoute ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#38bdf8');
+        this.destLabel.backgroundColor = hasAirportRoute
+          ? Cesium.Color.fromCssColorString('rgba(217, 119, 6, 0.95)')
+          : Cesium.Color.fromCssColorString('rgba(8, 15, 30, 0.92)');
       }
 
-      // Ground radar beacons at endpoints
-      if (!this.originBillboard && this.airportPinTexture) {
-        this.originBillboard = this.billboardCollection.add({
-          position: originPos,
-          image: this.airportPinTexture,
-          show: isOriginVisible,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scale: 0.9,
-        });
-      } else if (this.originBillboard) {
-        this.originBillboard.show = isOriginVisible;
-        this.originBillboard.position = originPos;
-      }
+      // Ground radar beacons at airport endpoints (ONLY for real airport routes on land!)
+      if (hasAirportRoute) {
+        if (!this.originBillboard && this.airportPinTexture) {
+          this.originBillboard = this.billboardCollection.add({
+            position: originPos,
+            image: this.airportPinTexture,
+            show: isOriginVisible,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            scale: 0.9,
+          });
+        } else if (this.originBillboard) {
+          this.originBillboard.show = isOriginVisible;
+          this.originBillboard.position = originPos;
+        }
 
-      if (!this.destBillboard && this.airportPinTexture) {
-        this.destBillboard = this.billboardCollection.add({
-          position: destPos,
-          image: this.airportPinTexture,
-          show: isDestVisible,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scale: 0.9,
-        });
-      } else if (this.destBillboard) {
-        this.destBillboard.show = isDestVisible;
-        this.destBillboard.position = destPos;
+        if (!this.destBillboard && this.airportPinTexture) {
+          this.destBillboard = this.billboardCollection.add({
+            position: destPos,
+            image: this.airportPinTexture,
+            show: isDestVisible,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            scale: 0.9,
+          });
+        } else if (this.destBillboard) {
+          this.destBillboard.show = isDestVisible;
+          this.destBillboard.position = destPos;
+        }
+      } else {
+        if (this.originBillboard) this.originBillboard.show = false;
+        if (this.destBillboard) this.destBillboard.show = false;
       }
     } else {
       // Hide selected route elements if none selected

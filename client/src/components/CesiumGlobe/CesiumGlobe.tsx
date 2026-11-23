@@ -324,7 +324,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
           destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
           orientation: {
             heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-55),
+            pitch: Cesium.Math.toRadians(-78),
             roll: 0,
           },
           duration: 2.5,
