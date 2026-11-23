@@ -8,11 +8,11 @@ interface AircraftBillboard extends Cesium.Billboard {
 // Pre-render cached commercial airliner canvas data URLs for performance
 const textureCache: Record<string, string> = {};
 
-function getAirlinerTexture(color: string, isSelected: boolean): string {
-  const key = `${color}_${isSelected ? '1' : '0'}`;
+function getAirlinerTexture(altitudeColor: string, isSelected: boolean): string {
+  const key = `${altitudeColor}_${isSelected ? '1' : '0'}`;
   if (textureCache[key]) return textureCache[key];
 
-  const size = isSelected ? 72 : 56;
+  const size = isSelected ? 160 : 128;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -22,126 +22,346 @@ function getAirlinerTexture(color: string, isSelected: boolean): string {
   const cx = size / 2;
   const cy = size / 2;
 
-  // 1. Tactical Targeting Reticle (when selected)
+  // 1. Tactical Targeting Reticle & Glowing Beacon Halo (when selected)
   if (isSelected) {
+    ctx.save();
+    // Soft outer surveillance halo
     ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.45, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.12)';
+    ctx.fill();
+
+    // Sharp cyan reticle ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.44, 0, Math.PI * 2);
     ctx.strokeStyle = '#00f0ff';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.0;
     ctx.shadowColor = '#00f0ff';
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 10;
     ctx.stroke();
 
-    // Crosshairs
+    // Crosshairs with center gap
+    const gap = 16;
     ctx.beginPath();
-    ctx.moveTo(cx, 0); ctx.lineTo(cx, 8);
-    ctx.moveTo(cx, size); ctx.lineTo(cx, size - 8);
-    ctx.moveTo(0, cy); ctx.lineTo(8, cy);
-    ctx.moveTo(size, cy); ctx.lineTo(size - 8, cy);
+    // Top
+    ctx.moveTo(cx, 8); ctx.lineTo(cx, cy - gap);
+    // Bottom
+    ctx.moveTo(cx, size - 8); ctx.lineTo(cx, cy + gap);
+    // Left
+    ctx.moveTo(8, cy); ctx.lineTo(cx - gap, cy);
+    // Right
+    ctx.moveTo(size - 8, cy); ctx.lineTo(cx + gap, cy);
     ctx.strokeStyle = '#00f0ff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 4 Corner brackets
+    const bLen = 10;
+    const bDist = size * 0.42;
+    // Top-Left
+    ctx.beginPath();
+    ctx.moveTo(cx - bDist, cy - bDist + bLen);
+    ctx.lineTo(cx - bDist, cy - bDist);
+    ctx.lineTo(cx - bDist + bLen, cy - bDist);
+    // Top-Right
+    ctx.moveTo(cx + bDist - bLen, cy - bDist);
+    ctx.lineTo(cx + bDist, cy - bDist);
+    ctx.lineTo(cx + bDist, cy - bDist + bLen);
+    // Bottom-Left
+    ctx.moveTo(cx - bDist, cy + bDist - bLen);
+    ctx.lineTo(cx - bDist, cy + bDist);
+    ctx.lineTo(cx - bDist + bLen, cy + bDist);
+    // Bottom-Right
+    ctx.moveTo(cx + bDist - bLen, cy + bDist);
+    ctx.lineTo(cx + bDist, cy + bDist);
+    ctx.lineTo(cx + bDist, cy + bDist - bLen);
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.restore();
   }
-
-  // 2. Soft Beacon Halo (for high visibility against dark oceans and continents)
-  ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.35, 0, Math.PI * 2);
-  ctx.fillStyle = isSelected ? 'rgba(0, 240, 255, 0.45)' : `${color}40`;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 12;
-  ctx.fill();
 
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Normalize coordinates: design space is [-32, 32]
-  const s = size / 64;
+  // Design space is 120 coordinate units (-60 to +60 in X, -60 to +60 in Y)
+  const s = size / 120;
   ctx.scale(s, s);
 
-  const bodyColor = isSelected ? '#ffffff' : color;
-  ctx.fillStyle = bodyColor;
-  ctx.strokeStyle = '#020617';
-  ctx.lineWidth = 1.8;
-  ctx.shadowColor = isSelected ? '#00f0ff' : color;
-  ctx.shadowBlur = isSelected ? 10 : 4;
+  const outlineColor = '#334155';
+  const redAccent = isSelected ? '#00f0ff' : '#dc2626';
+  const redShadow = isSelected ? '#0284c7' : '#991b1b';
 
-  // 3. MAIN WINGS (Authentic swept-back commercial jet airliner wings)
+  // --- 2. HORIZONTAL STABILIZERS (Tail Wings) ---
   ctx.beginPath();
-  ctx.moveTo(0, -6); // Forward wing root
-  ctx.lineTo(26, 9); // Right wingtip leading edge
-  ctx.lineTo(25, 13); // Right wingtip trailing edge (winglet)
-  ctx.lineTo(4, 6); // Right wing root trailing edge
-  ctx.lineTo(-4, 6); // Left wing root trailing edge
-  ctx.lineTo(-25, 13); // Left wingtip trailing edge (winglet)
-  ctx.lineTo(-26, 9); // Left wingtip leading edge
+  ctx.moveTo(0, 36);
+  ctx.lineTo(26, 47);
+  ctx.lineTo(24, 51);
+  ctx.lineTo(0, 48);
+  ctx.lineTo(-24, 51);
+  ctx.lineTo(-26, 47);
   ctx.closePath();
+
+  const tailGrad = ctx.createLinearGradient(-26, 47, 26, 47);
+  tailGrad.addColorStop(0, '#e2e8f0');
+  tailGrad.addColorStop(0.5, '#ffffff');
+  tailGrad.addColorStop(1, '#cbd5e1');
+  ctx.fillStyle = tailGrad;
   ctx.fill();
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = 1.0;
   ctx.stroke();
 
-  // 4. JET ENGINES (Twin turbofan engine pods mounted under wings)
-  // Left Engine
+  // Tail elevator trim line
   ctx.beginPath();
-  ctx.ellipse(-11, 4, 3.2, 6.5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(4, 46); ctx.lineTo(23, 49);
+  ctx.moveTo(-4, 46); ctx.lineTo(-23, 49);
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 0.8;
   ctx.stroke();
 
-  // Right Engine
+  // --- 3. MAIN WINGS (Aerodynamic Swept Wings with Wing Root Fillets) ---
   ctx.beginPath();
-  ctx.ellipse(11, 4, 3.2, 6.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // 5. HORIZONTAL STABILIZERS (Tail wings)
-  ctx.beginPath();
-  ctx.moveTo(0, 18);
-  ctx.lineTo(13, 25);
-  ctx.lineTo(12, 28);
-  ctx.lineTo(0, 24);
-  ctx.lineTo(-12, 28);
-  ctx.lineTo(-13, 25);
+  ctx.moveTo(0, -14); // forward wing root
+  ctx.bezierCurveTo(4, -14, 8, -12, 10, -7); // right wing root fillet
+  ctx.lineTo(52, 15); // right wingtip leading edge
+  ctx.lineTo(50, 19); // right wingtip trailing edge
+  ctx.lineTo(10, 8); // right wing trailing edge root
+  ctx.bezierCurveTo(7, 10, 4, 12, 0, 12); // right aft blend
+  ctx.bezierCurveTo(-4, 12, -7, 10, -10, 8); // left aft blend
+  ctx.lineTo(-50, 19); // left wingtip trailing edge
+  ctx.lineTo(-52, 15); // left wingtip leading edge
+  ctx.bezierCurveTo(-8, -12, -4, -14, 0, -14); // left wing root fillet
   ctx.closePath();
+
+  const wingGrad = ctx.createLinearGradient(-52, 0, 52, 0);
+  wingGrad.addColorStop(0, '#e2e8f0');
+  wingGrad.addColorStop(0.2, '#f8fafc');
+  wingGrad.addColorStop(0.5, '#ffffff');
+  wingGrad.addColorStop(0.8, '#f8fafc');
+  wingGrad.addColorStop(1, '#cbd5e1');
+  ctx.fillStyle = wingGrad;
   ctx.fill();
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = 1.2;
   ctx.stroke();
 
-  // 6. STREAMLINED FUSELAGE
+  // --- 4. WING ACCENT STRIPES (Bold Dual Bands per Wing matching screenshot) ---
+  const drawWingStripe = (xStart: number, xEnd: number, isRight: boolean) => {
+    ctx.save();
+    ctx.beginPath();
+    if (isRight) {
+      const yL1 = -7 + (xStart - 10) * (22 / 42);
+      const yL2 = -7 + (xEnd - 10) * (22 / 42);
+      const yT2 = 8 + (xEnd - 10) * (11 / 40);
+      const yT1 = 8 + (xStart - 10) * (11 / 40);
+      ctx.moveTo(xStart, yL1);
+      ctx.lineTo(xEnd, yL2);
+      ctx.lineTo(xEnd, yT2);
+      ctx.lineTo(xStart, yT1);
+    } else {
+      const xs = -xStart;
+      const xe = -xEnd;
+      const yL1 = -7 + (xStart - 10) * (22 / 42);
+      const yL2 = -7 + (xEnd - 10) * (22 / 42);
+      const yT2 = 8 + (xEnd - 10) * (11 / 40);
+      const yT1 = 8 + (xStart - 10) * (11 / 40);
+      ctx.moveTo(xs, yL1);
+      ctx.lineTo(xe, yL2);
+      ctx.lineTo(xe, yT2);
+      ctx.lineTo(xs, yT1);
+    }
+    ctx.closePath();
+    ctx.fillStyle = redAccent;
+    ctx.fill();
+    ctx.strokeStyle = redShadow;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // Mid-wing stripes
+  drawWingStripe(20, 27, true);
+  drawWingStripe(20, 27, false);
+
+  // Outer wingtip stripes
+  drawWingStripe(36, 44, true);
+  drawWingStripe(36, 44, false);
+
+  // --- 5. FLAP TRACK CANOES (Fairing Pods under Trailing Edges) ---
+  const canoes = [18, 28, -18, -28];
+  for (const cxPos of canoes) {
+    const isR = cxPos > 0;
+    const xAbs = Math.abs(cxPos);
+    const yBase = 8 + (xAbs - 10) * (11 / 40);
+    ctx.beginPath();
+    ctx.ellipse(cxPos, yBase + 1.5, 1.2, 3.2, isR ? 0.05 : -0.05, 0, Math.PI * 2);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fill();
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  }
+
+  // --- 6. TURBOFAN JET ENGINES (Underwing Pods) ---
+  const drawEngine = (engX: number) => {
+    const engY = 2;
+    // Engine Pylon
+    ctx.beginPath();
+    ctx.rect(engX - 1, engY - 7, 2, 8);
+    ctx.fillStyle = '#64748b';
+    ctx.fill();
+
+    // Engine Nacelle Cowling
+    ctx.beginPath();
+    ctx.ellipse(engX, engY, 4.0, 8.5, 0, 0, Math.PI * 2);
+    const engGrad = ctx.createLinearGradient(engX - 4, engY, engX + 4, engY);
+    engGrad.addColorStop(0, '#cbd5e1');
+    engGrad.addColorStop(0.4, '#ffffff');
+    engGrad.addColorStop(1, '#94a3b8');
+    ctx.fillStyle = engGrad;
+    ctx.fill();
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Intake Rim & Dark Fan Face
+    ctx.beginPath();
+    ctx.ellipse(engX, engY - 6.5, 3.2, 1.8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    // Titanium Spinner Cone
+    ctx.beginPath();
+    ctx.arc(engX, engY - 6.5, 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fill();
+
+    // Exhaust Nozzle
+    ctx.beginPath();
+    ctx.ellipse(engX, engY + 7.5, 2.5, 1.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#334155';
+    ctx.fill();
+  };
+
+  drawEngine(17);
+  drawEngine(-17);
+
+  // --- 7. STREAMLINED 3D FUSELAGE ---
   ctx.beginPath();
-  ctx.moveTo(0, -26); // Nose tip
-  ctx.bezierCurveTo(4, -26, 4.5, -15, 4.5, 12); // Right cabin side
-  ctx.bezierCurveTo(4.5, 20, 2, 26, 0, 29); // Right tail cone
-  ctx.bezierCurveTo(-2, 26, -4.5, 20, -4.5, 12); // Left tail cone
-  ctx.bezierCurveTo(-4.5, -15, -4, -26, 0, -26); // Left cabin side
+  ctx.moveTo(0, -48); // Aerodynamic nose cone tip
+  // Right side of fuselage
+  ctx.bezierCurveTo(4.5, -48, 6.2, -36, 6.2, -15);
+  ctx.lineTo(6.2, 24);
+  ctx.bezierCurveTo(6.2, 38, 2.8, 48, 0, 52); // Tail cone
+  // Left side of fuselage
+  ctx.bezierCurveTo(-2.8, 48, -6.2, 38, -6.2, 24);
+  ctx.lineTo(-6.2, -15);
+  ctx.bezierCurveTo(-6.2, -36, -4.5, -48, 0, -48);
   ctx.closePath();
+
+  // Cylindrical 3D Volumetric Fuselage Shading
+  const fuseGrad = ctx.createLinearGradient(-6.2, 0, 6.2, 0);
+  fuseGrad.addColorStop(0, '#cbd5e1');
+  fuseGrad.addColorStop(0.2, '#f1f5f9');
+  fuseGrad.addColorStop(0.45, '#ffffff');
+  fuseGrad.addColorStop(0.7, '#f8fafc');
+  fuseGrad.addColorStop(1, '#94a3b8');
+  ctx.fillStyle = fuseGrad;
   ctx.fill();
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = 1.2;
   ctx.stroke();
 
-  // 7. COCKPIT WINDSHIELD (Aviation glass visor)
+  // Centerline Specular Ridge Highlight
   ctx.beginPath();
-  ctx.moveTo(-2.5, -19);
-  ctx.bezierCurveTo(-1.5, -21.5, 1.5, -21.5, 2.5, -19);
-  ctx.lineTo(2, -16.5);
-  ctx.lineTo(-2, -16.5);
+  ctx.moveTo(0, -45);
+  ctx.lineTo(0, 32);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // --- 8. COCKPIT WINDSHIELD ("Bandit Mask" Curved Visor) ---
+  ctx.beginPath();
+  ctx.moveTo(0, -43);
+  ctx.bezierCurveTo(3.2, -43, 4.2, -37, 4.2, -34);
+  ctx.lineTo(3.2, -33);
+  ctx.bezierCurveTo(2.2, -35, 1.0, -36.5, 0, -36.5);
+  ctx.bezierCurveTo(-1.0, -36.5, -2.2, -35, -3.2, -33);
+  ctx.lineTo(-4.2, -34);
+  ctx.bezierCurveTo(-4.2, -37, -3.2, -43, 0, -43);
   ctx.closePath();
   ctx.fillStyle = '#090d16';
-  ctx.shadowBlur = 0;
   ctx.fill();
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
 
-  // 8. NAVIGATION LIGHTS (Aviation standard: Port Red, Starboard Green, Tail Strobe)
+  // Cockpit glass reflection arc
+  ctx.beginPath();
+  ctx.arc(0, -38, 2.5, Math.PI * 1.1, Math.PI * 1.9);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // --- 9. PASSENGER CABIN WINDOWS (Dual Rows) ---
+  const winYStart = -28;
+  const winYEnd = 24;
+  const winCount = 18;
+  for (let i = 0; i < winCount; i++) {
+    const wy = winYStart + (i / (winCount - 1)) * (winYEnd - winYStart);
+    // Port window
+    ctx.beginPath();
+    ctx.arc(-4.6, wy, 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = '#334155';
+    ctx.fill();
+
+    // Starboard window
+    ctx.beginPath();
+    ctx.arc(4.6, wy, 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = '#334155';
+    ctx.fill();
+  }
+
+  // --- 10. DORSAL TAIL FIN & RED ACCENT STRIPE ---
+  ctx.beginPath();
+  ctx.moveTo(0, 26);
+  ctx.bezierCurveTo(1.4, 30, 1.8, 40, 0.8, 50);
+  ctx.lineTo(-0.8, 50);
+  ctx.bezierCurveTo(-1.8, 40, -1.4, 30, 0, 26);
+  ctx.closePath();
+  ctx.fillStyle = redAccent;
+  ctx.fill();
+  ctx.strokeStyle = redShadow;
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+
+  // --- 11. NAVIGATION LIGHTS (ICAO Standard Port Red, Starboard Green, Tail Strobe) ---
   // Left Wingtip (Port Red)
   ctx.beginPath();
-  ctx.arc(-25.5, 11, 2, 0, Math.PI * 2);
+  ctx.arc(-51, 17, 1.8, 0, Math.PI * 2);
   ctx.fillStyle = '#ef4444';
+  ctx.shadowColor = '#ef4444';
+  ctx.shadowBlur = 6;
   ctx.fill();
 
   // Right Wingtip (Starboard Green)
   ctx.beginPath();
-  ctx.arc(25.5, 11, 2, 0, Math.PI * 2);
+  ctx.arc(51, 17, 1.8, 0, Math.PI * 2);
   ctx.fillStyle = '#10b981';
+  ctx.shadowColor = '#10b981';
+  ctx.shadowBlur = 6;
   ctx.fill();
 
-  // Tail Strobe (White)
+  // Tail Strobe (White Beacon)
   ctx.beginPath();
-  ctx.arc(0, 28.5, 1.8, 0, Math.PI * 2);
+  ctx.arc(0, 51.5, 1.5, 0, Math.PI * 2);
   ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 6;
   ctx.fill();
 
   ctx.restore();
@@ -271,12 +491,12 @@ export class AircraftLayer {
           image: textureUrl,
           rotation: finalRotation,
           alignedAxis: Cesium.Cartesian3.ZERO,
-          scale: isSelected ? 1.25 : 1.0,
+          scale: isSelected ? 0.52 : 0.42,
           id: ac.id,
           show: isVisible,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
           heightReference: Cesium.HeightReference.NONE,
-          scaleByDistance: new Cesium.NearFarScalar(1.0e3, 1.25, 2.5e7, 0.95),
+          scaleByDistance: new Cesium.NearFarScalar(1.0e3, 1.15, 2.0e7, 0.85),
         }) as AircraftBillboard;
         billboard._currentTextureKey = textureKey;
         this.billboards.set(ac.id, billboard);
@@ -288,7 +508,7 @@ export class AircraftLayer {
         // ONLY update image and scale when selection/texture actually changes!
         if (billboard._currentTextureKey !== textureKey) {
           billboard.image = textureUrl;
-          billboard.scale = isSelected ? 1.25 : 1.0;
+          billboard.scale = isSelected ? 0.52 : 0.42;
           billboard._currentTextureKey = textureKey;
         }
       }
@@ -306,7 +526,7 @@ export class AircraftLayer {
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 3,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          pixelOffset: new Cesium.Cartesian2(0, isSelected ? 30 : 25),
+          pixelOffset: new Cesium.Cartesian2(0, isSelected ? 42 : 32),
           show: isVisible,
           showBackground: true,
           backgroundColor: isSelected
