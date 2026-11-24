@@ -16,7 +16,12 @@ export const Header: React.FC<HeaderProps> = () => {
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setUtcTime(now.toISOString().substring(11, 19) + ' UTC');
+      const isMobileSmall = typeof window !== 'undefined' && window.innerWidth <= 480;
+      setUtcTime(
+        isMobileSmall
+          ? now.toISOString().substring(11, 16) + ' UTC'
+          : now.toISOString().substring(11, 19) + ' UTC'
+      );
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);

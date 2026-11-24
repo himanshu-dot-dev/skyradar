@@ -28,6 +28,7 @@ export const AircraftSearchDrawer: React.FC<AircraftSearchDrawerProps> = ({ glob
   const aircraftList = useAircraftStore((s) => s.aircraftList);
   const totalCount = useAircraftStore((s) => s.totalCount);
   const selectedAircraftId = useAircraftStore((s) => s.selectedAircraftId);
+  const selectedAircraft = useAircraftStore((s) => s.selectedAircraft);
   const selectAircraft = useAircraftStore((s) => s.selectAircraft);
 
   const filters = useAircraftStore((s) => s.filters);
@@ -44,6 +45,9 @@ export const AircraftSearchDrawer: React.FC<AircraftSearchDrawerProps> = ({ glob
 
   const handleSelectAircraft = (ac: NormalizedAircraft) => {
     selectAircraft(ac.id);
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      setDrawerOpen(false);
+    }
     if (globeHandle) {
       globeHandle.flyToHub(
         ac.position.latitude,
@@ -54,7 +58,20 @@ export const AircraftSearchDrawer: React.FC<AircraftSearchDrawerProps> = ({ glob
   };
 
   return (
-    <aside className={`sidebar-panel ${!isDrawerOpen ? 'collapsed' : ''}`}>
+    <>
+      {/* Mobile Floating Thumb Trigger Button (Hidden when inspector or drawer is open) */}
+      {!isDrawerOpen && !selectedAircraft && (
+        <button
+          className="mobile-flight-btn font-mono"
+          onClick={() => setDrawerOpen(true)}
+          title="Open Flight Directory"
+        >
+          <Plane size={14} color="var(--accent-blue)" />
+          <span>{totalCount > 0 ? `${totalCount.toLocaleString()} FLIGHTS` : 'FLIGHTS'}</span>
+        </button>
+      )}
+
+      <aside className={`sidebar-panel ${!isDrawerOpen ? 'collapsed' : ''}`}>
       {/* 1. Collapsed 48px Rail View */}
       {!isDrawerOpen ? (
         <div className="sidebar-rail-content">
@@ -301,5 +318,6 @@ export const AircraftSearchDrawer: React.FC<AircraftSearchDrawerProps> = ({ glob
         </div>
       )}
     </aside>
+    </>
   );
 };

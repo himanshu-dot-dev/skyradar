@@ -52,19 +52,22 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
     <aside className="inspector-panel">
       {/* 1. Header Bar: Callsign, Operator, and Close button */}
       <div className="inspector-header">
-        <div className="inspector-title-col">
-          <span className="inspector-callsign font-mono">{callsign}</span>
-          <span className="inspector-sub">
-            {operator} • {selectedAircraft.aircraftType || 'Aviation'}
-          </span>
+        <div className="mobile-drag-handle" />
+        <div className="inspector-header-top">
+          <div className="inspector-title-col">
+            <span className="inspector-callsign font-mono">{callsign}</span>
+            <span className="inspector-sub">
+              {operator} • {selectedAircraft.aircraftType || 'Aviation'}
+            </span>
+          </div>
+          <button
+            className="close-inspector-btn"
+            title="Close Inspector (Esc)"
+            onClick={clearSelection}
+          >
+            <X size={15} />
+          </button>
         </div>
-        <button
-          className="close-inspector-btn"
-          title="Close Inspector (Esc)"
-          onClick={clearSelection}
-        >
-          <X size={15} />
-        </button>
       </div>
 
       {/* 2. Gate-to-Gate Route Strip */}

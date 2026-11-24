@@ -103,7 +103,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
     <aside
       className="globe-tools"
       style={{
-        right: selectedAircraft ? 374 : 14,
+        right: typeof window !== 'undefined' && window.innerWidth <= 768 ? 10 : (selectedAircraft ? 374 : 14),
       }}
     >
       {/* Zoom In */}

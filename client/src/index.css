@@ -798,3 +798,172 @@ html, body, #root {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   z-index: 30;
 }
+
+/* ==========================================================================
+   5. RESPONSIVE MOBILE LAYOUT (<= 768px)
+   ========================================================================== */
+.mobile-flight-btn {
+  display: none;
+}
+.mobile-drag-handle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Top Header on Mobile */
+  .top-header {
+    padding: 0 12px;
+    height: 44px;
+    border-bottom: 1px solid var(--border-medium);
+  }
+  .header-left {
+    gap: 8px;
+  }
+  .brand-logo {
+    font-size: 12px;
+    letter-spacing: 0.05em;
+  }
+  .header-divider {
+    height: 12px;
+  }
+  .flight-counter .label {
+    display: none; /* Only show number on mobile to save space */
+  }
+  .flight-counter {
+    font-size: 11px;
+  }
+  .mode-switch {
+    padding: 1px;
+  }
+  .mode-tab {
+    padding: 2px 6px;
+    font-size: 9px;
+  }
+  .utc-clock {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  /* Left Flight Directory Drawer on Mobile: Full-width Overlay */
+  .sidebar-panel {
+    width: 100% !important;
+    max-width: 100vw;
+    z-index: 40;
+    border-right: none;
+    transition: transform 0.22s ease;
+  }
+  .sidebar-panel.collapsed {
+    width: 0 !important;
+    display: none !important;
+  }
+  .sidebar-rail-content {
+    display: none !important;
+  }
+
+  /* Mobile Floating Flight Trigger Button (When Drawer is closed) */
+  .mobile-flight-btn {
+    position: absolute;
+    bottom: 20px;
+    left: 16px;
+    z-index: 35;
+    pointer-events: auto;
+    height: 38px;
+    padding: 0 16px;
+    background: var(--surface-1);
+    border: 1px solid var(--border-medium);
+    border-radius: 19px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-high);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .mobile-flight-btn:hover {
+    background: var(--surface-2);
+  }
+
+  /* Telemetry Inspector Sheet on Mobile: Native Bottom Sheet */
+  .inspector-panel {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-height: 52vh;
+    z-index: 35;
+    border-left: none;
+    border-top: 1px solid var(--border-medium);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.7);
+  }
+  .mobile-drag-handle {
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 2px;
+    margin: 0 auto 8px auto;
+  }
+  .inspector-header {
+    padding: 8px 14px 10px 14px;
+    border-radius: 14px 14px 0 0;
+    flex-direction: column;
+    gap: 0;
+  }
+  .inspector-header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .inspector-callsign {
+    font-size: 16px;
+  }
+  .route-strip {
+    padding: 10px 14px;
+  }
+  .telemetry-grid {
+    padding: 10px 14px;
+    gap: 8px 12px;
+  }
+  .metric-value {
+    font-size: 15px;
+  }
+  .specs-table {
+    padding: 8px 14px;
+    font-size: 10px;
+  }
+  .inspector-actions {
+    padding: 10px 14px;
+  }
+
+  /* Globe Toolbar on Mobile: Docked top-right, avoids bottom sheet */
+  .globe-tools {
+    top: 52px;
+    right: 10px !important;
+    gap: 4px;
+  }
+  .tool-btn {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-logo span {
+    font-size: 11px;
+  }
+  .header-left {
+    gap: 6px;
+  }
+  .mode-tab {
+    padding: 2px 5px;
+  }
+  .mode-tab span:last-child {
+    font-size: 9px;
+  }
+}
