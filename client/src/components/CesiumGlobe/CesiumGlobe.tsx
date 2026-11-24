@@ -8,7 +8,6 @@ import { FlightPathLayer } from './FlightPathLayer';
 import { WeatherRadarLayer, type WeatherProviderType } from './WeatherRadarLayer';
 import { SimulatedTrafficGenerator } from '../../services/simulatedTraffic';
 import { LiveTrafficService } from '../../services/liveTraffic';
-import type { NormalizedAircraft } from '@shared/types';
 
 // Explicitly set Cesium base URL for static assets/workers and suppress Ion warnings
 (Cesium.buildModuleUrl as any).setBaseUrl('/cesium/');
@@ -62,7 +61,7 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
   const liveTrafficRef = useRef<LiveTrafficService | null>(null);
   const lastLivePollRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(performance.now());
+  const lastTimeRef = useRef<number>(0);
   const wasFollowingRef = useRef<boolean>(false);
 
   const imageryLayer = useGlobeStore((s) => s.imageryLayer);
@@ -296,6 +295,9 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     const loop = (currentTime: number) => {
       if (!viewerRef.current || viewerRef.current.isDestroyed()) return;
 
+      if (lastTimeRef.current === 0) {
+        lastTimeRef.current = currentTime;
+      }
       const deltaSeconds = Math.min((currentTime - lastTimeRef.current) / 1000, 0.1);
       lastTimeRef.current = currentTime;
 
