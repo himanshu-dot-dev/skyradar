@@ -1,16 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   Search,
   X,
   ChevronLeft,
-  SlidersHorizontal,
-  RotateCcw,
   Plane,
   ArrowUpRight,
   ArrowDownRight,
   Minus,
-  AlertTriangle,
-  Eye,
 } from 'lucide-react';
 import { useAircraftStore, matchesFilters } from '../../store/aircraftStore';
 import { formatAltitude } from '../../utils/geoMath';
@@ -35,8 +31,6 @@ export const AircraftSearchDrawer: React.FC<AircraftSearchDrawerProps> = ({ glob
   const setSearchQuery = useAircraftStore((s) => s.setSearchQuery);
   const setFilters = useAircraftStore((s) => s.setFilters);
   const resetFilters = useAircraftStore((s) => s.resetFilters);
-
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Compute filtered aircraft list
   const filteredAircraft = useMemo(() => {
@@ -90,23 +84,13 @@ export const AircraftSearchDrawer: React.FC<AircraftSearchDrawerProps> = ({ glob
           <div className="sidebar-top">
             <div className="sidebar-title-row">
               <span className="sidebar-title">Flight Directory</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <button
-                  className="collapse-btn"
-                  title="Advanced Filters"
-                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                  style={{ color: showAdvancedFilters ? 'var(--text-high)' : undefined }}
-                >
-                  <SlidersHorizontal size={13} />
-                </button>
-                <button
-                  className="collapse-btn"
-                  title="Collapse Directory"
-                  onClick={toggleDrawer}
-                >
-                  <ChevronLeft size={15} />
-                </button>
-              </div>
+              <button
+                className="collapse-btn"
+                title="Collapse Directory"
+                onClick={toggleDrawer}
+              >
+                <ChevronLeft size={15} />
+              </button>
             </div>
 
             {/* Integrated Search Input */}
@@ -133,10 +117,10 @@ export const AircraftSearchDrawer: React.FC<AircraftSearchDrawerProps> = ({ glob
             <div className="filter-tabs">
               <button
                 className={`filter-btn ${
-                  filters.altitudePreset === 'all' && filters.verticalProfile === 'all' ? 'active' : ''
+                  filters.altitudePreset === 'all' && filters.verticalProfile === 'all' && !filters.emergencyOnly ? 'active' : ''
                 }`}
                 onClick={() => {
-                  setFilters({ altitudePreset: 'all', verticalProfile: 'all' });
+                  setFilters({ altitudePreset: 'all', verticalProfile: 'all', emergencyOnly: false });
                 }}
               >
                 All ({filteredAircraft.length})
@@ -161,61 +145,19 @@ export const AircraftSearchDrawer: React.FC<AircraftSearchDrawerProps> = ({ glob
               >
                 Climb
               </button>
-            </div>
-
-            {/* Optional Collapsible Advanced Filters */}
-            {showAdvancedFilters && (
-              <div
+              <button
+                className={`filter-btn ${filters.emergencyOnly ? 'active' : ''}`}
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                  padding: '8px 0 2px 0',
-                  borderTop: '1px solid var(--border-subtle)',
-                  fontSize: 10,
+                  color: filters.emergencyOnly ? 'var(--accent-red)' : undefined,
+                  borderColor: filters.emergencyOnly ? 'rgba(184, 60, 72, 0.4)' : undefined,
+                }}
+                onClick={() => {
+                  setFilters({ emergencyOnly: !filters.emergencyOnly });
                 }}
               >
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    className={`filter-btn ${filters.emergencyOnly ? 'active' : ''}`}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 4,
-                      color: filters.emergencyOnly ? 'var(--accent-red)' : undefined,
-                    }}
-                    onClick={() => setFilters({ emergencyOnly: !filters.emergencyOnly })}
-                  >
-                    <AlertTriangle size={11} />
-                    <span>Squawk 7700</span>
-                  </button>
-                  <button
-                    className={`filter-btn ${filters.filterOnGlobe ? 'active' : ''}`}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 4,
-                    }}
-                    title="Filter 3D Globe to match search"
-                    onClick={() => setFilters({ filterOnGlobe: !filters.filterOnGlobe })}
-                  >
-                    <Eye size={11} />
-                    <span>Globe Sync</span>
-                  </button>
-                  <button
-                    className="collapse-btn"
-                    title="Reset All Filters"
-                    onClick={resetFilters}
-                  >
-                    <RotateCcw size={12} />
-                  </button>
-                </div>
-              </div>
-            )}
+                7700
+              </button>
+            </div>
           </div>
 
           {/* High-Density Flight List */}

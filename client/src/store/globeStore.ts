@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ImageryLayerType = 'blue-marble' | 'dark-radar' | 'natural-earth';
+export type ImageryLayerType = 'dark-radar' | 'blue-marble';
 
 export interface AviationHub {
   id: string;

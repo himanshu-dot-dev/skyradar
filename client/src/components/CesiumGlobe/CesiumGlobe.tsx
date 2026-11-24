@@ -34,24 +34,13 @@ interface CesiumGlobeProps {
 const loadImageryProvider = async (type: ImageryLayerType): Promise<Cesium.ImageryProvider> => {
   if (type === 'dark-radar') {
     return new Cesium.UrlTemplateImageryProvider({
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      subdomains: ['a', 'b', 'c', 'd'],
-      maximumLevel: 19,
-      credit: new Cesium.Credit('© OpenStreetMap, © CARTO', true),
+      url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+      maximumLevel: 16,
+      credit: new Cesium.Credit('Esri Dark Canvas', true),
     });
   }
 
-  if (type === 'natural-earth') {
-    return await Cesium.TileMapServiceImageryProvider.fromUrl(
-      Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII'),
-      {
-        fileExtension: 'jpg',
-        credit: new Cesium.Credit('Natural Earth II (Offline)', true),
-      }
-    );
-  }
-
-  // Default: NASA GIBS Blue Marble Next Generation WMTS
+  // NASA GIBS Blue Marble Next Generation WMTS
   return new Cesium.WebMapTileServiceImageryProvider({
     url: 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_NextGeneration/default/GoogleMapsCompatible_Level8/{TileMatrix}/{TileRow}/{TileCol}.jpg',
     layer: 'BlueMarble_NextGeneration',

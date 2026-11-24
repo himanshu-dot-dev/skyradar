@@ -6,11 +6,10 @@ import {
   Minus,
   RotateCcw,
   Layers,
-  MapPin,
   Route,
   CloudRain,
 } from 'lucide-react';
-import { useGlobeStore, AVIATION_HUBS, type AviationHub } from '../../store/globeStore';
+import { useGlobeStore } from '../../store/globeStore';
 import { useAircraftStore } from '../../store/aircraftStore';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
 
@@ -20,7 +19,6 @@ interface GlobeToolbarProps {
 
 export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   const [showLayerMenu, setShowLayerMenu] = useState(false);
-  const [showHubMenu, setShowHubMenu] = useState(false);
   const [cameraHeadingDeg, setCameraHeadingDeg] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
@@ -29,12 +27,10 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   const enableLighting = useGlobeStore((s) => s.enableLighting);
   const showFlightPaths = useGlobeStore((s) => s.showFlightPaths);
   const showWeatherRadar = useGlobeStore((s) => s.showWeatherRadar);
-  const selectedHub = useGlobeStore((s) => s.selectedHub);
   const setImageryLayer = useGlobeStore((s) => s.setImageryLayer);
   const toggleLighting = useGlobeStore((s) => s.toggleLighting);
   const toggleFlightPaths = useGlobeStore((s) => s.toggleFlightPaths);
   const toggleWeatherRadar = useGlobeStore((s) => s.toggleWeatherRadar);
-  const selectHub = useGlobeStore((s) => s.selectHub);
   const selectedAircraft = useAircraftStore((s) => s.selectedAircraft);
 
   // Dynamically track camera heading for the compass
@@ -82,17 +78,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
     showToast(!showWeatherRadar ? 'Weather Doppler: Active' : 'Weather Doppler: Off');
   };
 
-  const handleSelectHub = (hub: AviationHub) => {
-    selectHub(hub);
-    setShowHubMenu(false);
-    if (globeHandle) {
-      globeHandle.flyToHub(hub.latitude, hub.longitude, hub.cameraHeight);
-      showToast(`Navigating to ${hub.code} (${hub.city})`);
-    }
-  };
-
   const handleResetHome = () => {
-    selectHub(null);
     if (globeHandle) {
       globeHandle.flyToHome();
       showToast('Camera reset to global view');
@@ -100,12 +86,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   };
 
   return (
-    <aside
-      className="globe-tools"
-      style={{
-        right: typeof window !== 'undefined' && window.innerWidth <= 768 ? 10 : (selectedAircraft ? 374 : 14),
-      }}
-    >
+    <aside className={`globe-tools ${selectedAircraft ? 'inspector-open' : ''}`}>
       {/* Zoom In */}
       <button
         className="tool-btn"
@@ -174,22 +155,9 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
         title="Satellite Imagery Layers"
         onClick={() => {
           setShowLayerMenu(!showLayerMenu);
-          setShowHubMenu(false);
         }}
       >
         <Layers size={15} />
-      </button>
-
-      {/* Aviation Hubs Menu Toggle */}
-      <button
-        className={`tool-btn ${showHubMenu || selectedHub ? 'active' : ''}`}
-        title="Aviation Hub Teleport"
-        onClick={() => {
-          setShowHubMenu(!showHubMenu);
-          setShowLayerMenu(false);
-        }}
-      >
-        <MapPin size={15} />
       </button>
 
       <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
@@ -215,7 +183,6 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
           {[
             { id: 'blue-marble', label: 'NASA Blue Marble' },
             { id: 'dark-radar', label: 'Tactical Dark' },
-            { id: 'natural-earth', label: 'Natural Earth II' },
           ].map((layer) => (
             <button
               key={layer.id}
@@ -227,37 +194,6 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
               }}
             >
               {layer.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Dropdown: Aviation Hubs */}
-      {showHubMenu && (
-        <div className="tool-dropdown" style={{ top: 180, width: 200, maxHeight: 300, overflowY: 'auto' }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '2px 6px' }}>
-            Major Hubs
-          </div>
-          {AVIATION_HUBS.map((hub) => (
-            <button
-              key={hub.id}
-              className={`filter-btn ${selectedHub?.id === hub.id ? 'active' : ''}`}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '6px 8px',
-                fontSize: 11,
-              }}
-              onClick={() => handleSelectHub(hub)}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="font-mono" style={{ color: 'var(--accent-blue)', fontWeight: 700 }}>
-                  {hub.code}
-                </span>
-                <span>{hub.city}</span>
-              </div>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{hub.country}</span>
             </button>
           ))}
         </div>

@@ -738,11 +738,16 @@ html, body, #root {
 .globe-tools {
   position: absolute;
   top: 56px;
+  right: 14px;
   display: flex;
   flex-direction: column;
   gap: 5px;
   z-index: 20;
   transition: right 0.18s ease;
+}
+
+.globe-tools.inspector-open {
+  right: 374px;
 }
 
 .tool-btn {
@@ -942,7 +947,8 @@ html, body, #root {
   }
 
   /* Globe Toolbar on Mobile: Docked top-right, avoids bottom sheet */
-  .globe-tools {
+  .globe-tools,
+  .globe-tools.inspector-open {
     top: 52px;
     right: 10px !important;
     gap: 4px;

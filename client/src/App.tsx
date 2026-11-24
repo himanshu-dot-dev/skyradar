@@ -5,6 +5,7 @@ import { Header } from './components/Header/Header';
 import { AircraftTelemetryCard } from './components/Sidebar/AircraftTelemetryCard';
 import { AircraftSearchDrawer } from './components/Sidebar/AircraftSearchDrawer';
 import { useAircraftStore } from './store/aircraftStore';
+import { useGlobeStore } from './store/globeStore';
 
 export const App: React.FC = () => {
   const [globeHandle, setGlobeHandle] = useState<CesiumGlobeHandle | null>(null);
@@ -12,6 +13,7 @@ export const App: React.FC = () => {
   // Expose store for debugging & verification
   useEffect(() => {
     (window as any).useAircraftStore = useAircraftStore;
+    (window as any).useGlobeStore = useGlobeStore;
   }, []);
 
   return (
