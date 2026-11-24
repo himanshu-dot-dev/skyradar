@@ -33,18 +33,6 @@
   --sidebar-rail-width: 48px;
   --inspector-width: 360px;
 
-  /* Backward Compatibility Mappings */
-  --bg-space: var(--bg-base);
-  --bg-panel: var(--surface-1);
-  --bg-panel-hover: var(--surface-hover);
-  --border-cyan: var(--border-subtle);
-  --border-cyan-active: var(--border-active);
-  --accent-cyan: var(--accent-blue);
-  --accent-emerald: var(--accent-green);
-  --accent-rose: var(--accent-red);
-  --text-primary: var(--text-high);
-  --text-secondary: var(--text-medium);
-
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }

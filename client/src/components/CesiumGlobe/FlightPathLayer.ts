@@ -55,7 +55,7 @@ export class FlightPathLayer {
     // Concentric radar ring
     ctx.beginPath();
     ctx.arc(12, 12, 9, 0, Math.PI * 2);
-    ctx.strokeStyle = '#00f0ff';
+    ctx.strokeStyle = '#5b8cb4';
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -205,7 +205,7 @@ export class FlightPathLayer {
           width: 3.5,
           show: pastVisible,
           material: Cesium.Material.fromType('PolylineDash', {
-            color: Cesium.Color.fromCssColorString('#00f0ff'),
+            color: Cesium.Color.fromCssColorString('#5b8cb4'),
             gapColor: Cesium.Color.TRANSPARENT,
             dashLength: 16.0,
             dashPattern: 255,

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useGlobeStore, type ImageryLayerType } from '../../store/globeStore';
-import { useAircraftStore, matchesFilters } from '../../store/aircraftStore';
+import { useAircraftStore } from '../../store/aircraftStore';
 import { AircraftLayer } from './AircraftLayer';
 import { FlightPathLayer } from './FlightPathLayer';
 import { WeatherRadarLayer, type WeatherProviderType } from './WeatherRadarLayer';
@@ -68,7 +68,6 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
   const imageryLayer = useGlobeStore((s) => s.imageryLayer);
   const enableLighting = useGlobeStore((s) => s.enableLighting);
   const showAtmosphere = useGlobeStore((s) => s.showAtmosphere);
-  const selectedHub = useGlobeStore((s) => s.selectedHub);
 
   // Initialize Cesium Viewer, Aircraft Layer & Flight Path Layer
   useEffect(() => {
@@ -329,16 +328,11 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
       const currentSelectedId = useAircraftStore.getState().selectedAircraftId;
       const followingActive = useAircraftStore.getState().isFollowing;
       const pathsEnabled = useGlobeStore.getState().showFlightPaths;
-      const filters = useAircraftStore.getState().filters;
 
       useAircraftStore.getState().setAircraftList(updatedList);
 
-      const displayedList = filters.filterOnGlobe
-        ? updatedList.filter((ac) => ac.id === currentSelectedId || matchesFilters(ac, filters))
-        : updatedList;
-
-      aircraftLayer.update(displayedList, currentSelectedId);
-      flightPathLayer.update(displayedList, currentSelectedId, pathsEnabled);
+      aircraftLayer.update(updatedList, currentSelectedId);
+      flightPathLayer.update(updatedList, currentSelectedId, pathsEnabled);
 
       // Camera Follow tracking logic
       if (followingActive && currentSelectedId) {
@@ -481,31 +475,6 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     if (!viewer || viewer.isDestroyed()) return;
     viewer.scene.globe.showGroundAtmosphere = showAtmosphere;
   }, [showAtmosphere]);
-
-  // React to selected aviation hub
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer || viewer.isDestroyed() || !selectedHub) return;
-
-    if (wasFollowingRef.current) {
-      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-      wasFollowingRef.current = false;
-    }
-
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(
-        selectedHub.longitude,
-        selectedHub.latitude,
-        selectedHub.cameraHeight
-      ),
-      orientation: {
-        heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-55),
-        roll: 0,
-      },
-      duration: 2.5,
-    });
-  }, [selectedHub]);
 
   // React to weather radar toggle with multi-provider failover
   const showWeatherRadar = useGlobeStore((s) => s.showWeatherRadar);

@@ -9,7 +9,6 @@ export interface AircraftFilters {
   minSpeedKnots: number;
   verticalProfile: 'all' | 'climbing' | 'descending' | 'cruising';
   emergencyOnly: boolean;
-  filterOnGlobe: boolean;
 }
 
 export const DEFAULT_FILTERS: AircraftFilters = {
@@ -20,7 +19,6 @@ export const DEFAULT_FILTERS: AircraftFilters = {
   minSpeedKnots: 0,
   verticalProfile: 'all',
   emergencyOnly: false,
-  filterOnGlobe: false,
 };
 
 export function matchesFilters(ac: NormalizedAircraft, filters: AircraftFilters): boolean {
