@@ -1,5 +1,11 @@
 import * as Cesium from 'cesium';
 import type { NormalizedAircraft } from '@shared/types';
+import {
+  getAircraftCategoryDetails,
+  getAirlineLivery,
+  type AircraftCategory,
+  type AirlineLivery,
+} from '../../utils/aircraftClassification';
 
 interface AircraftBillboard extends Cesium.Billboard {
   _currentTextureKey?: string;
@@ -9,11 +15,746 @@ interface AircraftLabel extends Cesium.Label {
   _isCurrentlySelected?: boolean;
 }
 
-// Pre-render cached commercial airliner canvas data URLs for performance
+// Pre-rendered cached canvas textures for 60 FPS performance
 const textureCache: Record<string, string> = {};
 
-function getAirlinerTexture(altitudeColor: string, isSelected: boolean): string {
-  const key = `${altitudeColor}_${isSelected ? '1' : '0'}`;
+const OUTLINE_COLOR = '#334155';
+
+/**
+ * Draws tactical surveillance targeting reticle when selected
+ */
+function drawReticle(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
+  ctx.save();
+  // Soft outer surveillance halo
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(91, 140, 180, 0.15)';
+  ctx.fill();
+
+  // Sharp steel-blue reticle ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.44, 0, Math.PI * 2);
+  ctx.strokeStyle = '#5b8cb4';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  // Crosshairs with center gap
+  const gap = 16;
+  ctx.beginPath();
+  ctx.moveTo(cx, 8); ctx.lineTo(cx, cy - gap);
+  ctx.moveTo(cx, size - 8); ctx.lineTo(cx, cy + gap);
+  ctx.moveTo(8, cy); ctx.lineTo(cx - gap, cy);
+  ctx.moveTo(size - 8, cy); ctx.lineTo(cx + gap, cy);
+  ctx.strokeStyle = '#5b8cb4';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // 4 Corner brackets
+  const bLen = 10;
+  const bDist = size * 0.42;
+  ctx.beginPath();
+  // Top-Left
+  ctx.moveTo(cx - bDist, cy - bDist + bLen);
+  ctx.lineTo(cx - bDist, cy - bDist);
+  ctx.lineTo(cx - bDist + bLen, cy - bDist);
+  // Top-Right
+  ctx.moveTo(cx + bDist - bLen, cy - bDist);
+  ctx.lineTo(cx + bDist, cy - bDist);
+  ctx.lineTo(cx + bDist, cy - bDist + bLen);
+  // Bottom-Left
+  ctx.moveTo(cx - bDist, cy + bDist - bLen);
+  ctx.lineTo(cx - bDist, cy + bDist);
+  ctx.lineTo(cx - bDist + bLen, cy + bDist);
+  // Bottom-Right
+  ctx.moveTo(cx + bDist - bLen, cy + bDist);
+  ctx.lineTo(cx + bDist, cy + bDist);
+  ctx.lineTo(cx + bDist, cy + bDist - bLen);
+  ctx.strokeStyle = 'rgba(91, 140, 180, 0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Standard Jet Engine Nacelle Pod
+ */
+function drawJetEngine(ctx: CanvasRenderingContext2D, engX: number, engY = 2, radius = 4.0, length = 8.5) {
+  // Engine Pylon
+  ctx.beginPath();
+  ctx.rect(engX - 1, engY - length * 0.8, 2, length * 0.9);
+  ctx.fillStyle = '#64748b';
+  ctx.fill();
+
+  // Engine Nacelle Cowling
+  ctx.beginPath();
+  ctx.ellipse(engX, engY, radius, length, 0, 0, Math.PI * 2);
+  const engGrad = ctx.createLinearGradient(engX - radius, engY, engX + radius, engY);
+  engGrad.addColorStop(0, '#cbd5e1');
+  engGrad.addColorStop(0.4, '#ffffff');
+  engGrad.addColorStop(1, '#94a3b8');
+  ctx.fillStyle = engGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Intake Rim & Dark Fan Face
+  ctx.beginPath();
+  ctx.ellipse(engX, engY - length * 0.75, radius * 0.8, 1.8, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+
+  // Titanium Spinner Cone
+  ctx.beginPath();
+  ctx.arc(engX, engY - length * 0.75, 0.9, 0, Math.PI * 2);
+  ctx.fillStyle = '#f8fafc';
+  ctx.fill();
+
+  // Exhaust Nozzle
+  ctx.beginPath();
+  ctx.ellipse(engX, engY + length * 0.85, radius * 0.6, 1.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#334155';
+  ctx.fill();
+}
+
+/**
+ * Common Navigation Lights (Port Red, Starboard Green, Tail Strobe)
+ */
+function drawNavLights(ctx: CanvasRenderingContext2D, leftX: number, rightX: number, wingY: number, tailY = 51.5) {
+  // Left Wingtip (Port Red)
+  ctx.beginPath();
+  ctx.arc(leftX, wingY, 1.8, 0, Math.PI * 2);
+  ctx.fillStyle = '#ef4444';
+  ctx.shadowColor = '#ef4444';
+  ctx.shadowBlur = 5;
+  ctx.fill();
+
+  // Right Wingtip (Starboard Green)
+  ctx.beginPath();
+  ctx.arc(rightX, wingY, 1.8, 0, Math.PI * 2);
+  ctx.fillStyle = '#10b981';
+  ctx.shadowColor = '#10b981';
+  ctx.shadowBlur = 5;
+  ctx.fill();
+
+  // Tail Strobe (White Beacon)
+  ctx.beginPath();
+  ctx.arc(0, tailY, 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 5;
+  ctx.fill();
+  ctx.shadowBlur = 0; // reset
+}
+
+/**
+ * 1. Super Heavy Archetype: A380 / B747 (4 Turbofans, Swept Delta Wings, Double-Deck/Hump)
+ */
+function drawSuperHeavy(ctx: CanvasRenderingContext2D, livery: AirlineLivery) {
+  // Horizontal Stabilizers
+  ctx.beginPath();
+  ctx.moveTo(0, 36);
+  ctx.lineTo(28, 48);
+  ctx.lineTo(26, 52);
+  ctx.lineTo(0, 48);
+  ctx.lineTo(-26, 52);
+  ctx.lineTo(-28, 48);
+  ctx.closePath();
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Swept Delta Wings (Broad 58-unit span)
+  ctx.beginPath();
+  ctx.moveTo(0, -18);
+  ctx.bezierCurveTo(6, -18, 12, -14, 14, -8);
+  ctx.lineTo(58, 15);
+  ctx.lineTo(56, 21);
+  ctx.lineTo(14, 9);
+  ctx.bezierCurveTo(8, 12, 4, 14, 0, 14);
+  ctx.bezierCurveTo(-4, 14, -8, 12, -14, 9);
+  ctx.lineTo(-56, 21);
+  ctx.lineTo(-58, 15);
+  ctx.bezierCurveTo(-12, -14, -6, -18, 0, -18);
+  ctx.closePath();
+  const wingGrad = ctx.createLinearGradient(-58, 0, 58, 0);
+  wingGrad.addColorStop(0, '#e2e8f0');
+  wingGrad.addColorStop(0.5, '#ffffff');
+  wingGrad.addColorStop(1, '#cbd5e1');
+  ctx.fillStyle = wingGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Livery Wing Accent Stripes
+  ctx.beginPath();
+  ctx.moveTo(42, 6); ctx.lineTo(50, 11); ctx.lineTo(48, 15); ctx.lineTo(40, 10);
+  ctx.moveTo(-42, 6); ctx.lineTo(-50, 11); ctx.lineTo(-48, 15); ctx.lineTo(-40, 10);
+  ctx.closePath();
+  ctx.fillStyle = livery.accentColor;
+  ctx.fill();
+
+  // 4 Turbofan Engines (2 under each wing)
+  drawJetEngine(ctx, 20, 2, 4.2, 8.5);  // Right Inboard
+  drawJetEngine(ctx, 36, 7, 3.8, 7.8);  // Right Outboard
+  drawJetEngine(ctx, -20, 2, 4.2, 8.5); // Left Inboard
+  drawJetEngine(ctx, -36, 7, 3.8, 7.8); // Left Outboard
+
+  // Massive Fuselage (Radius 7.4, Double-deck bulge)
+  ctx.beginPath();
+  ctx.moveTo(0, -50);
+  ctx.bezierCurveTo(5.5, -50, 7.4, -36, 7.4, -15);
+  ctx.lineTo(7.4, 25);
+  ctx.bezierCurveTo(7.4, 40, 3.2, 50, 0, 53);
+  ctx.bezierCurveTo(-3.2, 50, -7.4, 40, -7.4, 25);
+  ctx.lineTo(-7.4, -15);
+  ctx.bezierCurveTo(-7.4, -36, -5.5, -50, 0, -50);
+  ctx.closePath();
+  const fuseGrad = ctx.createLinearGradient(-7.4, 0, 7.4, 0);
+  fuseGrad.addColorStop(0, '#cbd5e1');
+  fuseGrad.addColorStop(0.2, '#f1f5f9');
+  fuseGrad.addColorStop(0.5, '#ffffff');
+  fuseGrad.addColorStop(1, '#94a3b8');
+  ctx.fillStyle = fuseGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Cockpit Visor
+  ctx.beginPath();
+  ctx.arc(0, -42, 3.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+
+  // Tail Fin in Authentic Airline Livery
+  ctx.beginPath();
+  ctx.moveTo(0, 24);
+  ctx.bezierCurveTo(2.0, 30, 2.4, 42, 1.2, 52);
+  ctx.lineTo(-1.2, 52);
+  ctx.bezierCurveTo(-2.4, 42, -2.0, 30, 0, 24);
+  ctx.closePath();
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  drawNavLights(ctx, -57, 57, 18, 52.5);
+}
+
+/**
+ * 2. Widebody Heavy Archetype: B777 / B787 / A350 / A330 (2 Large High-Bypass Engines, Raked Wings)
+ */
+function drawWidebody(ctx: CanvasRenderingContext2D, livery: AirlineLivery) {
+  // Horizontal Stabilizers
+  ctx.beginPath();
+  ctx.moveTo(0, 36);
+  ctx.lineTo(26, 47);
+  ctx.lineTo(24, 51);
+  ctx.lineTo(0, 48);
+  ctx.lineTo(-24, 51);
+  ctx.lineTo(-26, 47);
+  ctx.closePath();
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Swept Wings with Raked Wingtips (Span 52)
+  ctx.beginPath();
+  ctx.moveTo(0, -15);
+  ctx.bezierCurveTo(4, -15, 8, -12, 10, -7);
+  ctx.lineTo(52, 14);
+  ctx.lineTo(50, 19);
+  ctx.lineTo(10, 8);
+  ctx.bezierCurveTo(7, 10, 4, 12, 0, 12);
+  ctx.bezierCurveTo(-4, 12, -7, 10, -10, 8);
+  ctx.lineTo(-50, 19);
+  ctx.lineTo(-52, 14);
+  ctx.bezierCurveTo(-8, -12, -4, -15, 0, -15);
+  ctx.closePath();
+  const wingGrad = ctx.createLinearGradient(-52, 0, 52, 0);
+  wingGrad.addColorStop(0, '#e2e8f0');
+  wingGrad.addColorStop(0.5, '#ffffff');
+  wingGrad.addColorStop(1, '#cbd5e1');
+  ctx.fillStyle = wingGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Livery Wing Stripes
+  ctx.beginPath();
+  ctx.moveTo(36, 7); ctx.lineTo(44, 11); ctx.lineTo(42, 15); ctx.lineTo(34, 11);
+  ctx.moveTo(-36, 7); ctx.lineTo(-44, 11); ctx.lineTo(-42, 15); ctx.lineTo(-34, 11);
+  ctx.closePath();
+  ctx.fillStyle = livery.accentColor;
+  ctx.fill();
+
+  // 2 Large Turbofan Engines (e.g. GE90 / Trent XWB)
+  drawJetEngine(ctx, 19, 2, 4.6, 9.2);
+  drawJetEngine(ctx, -19, 2, 4.6, 9.2);
+
+  // Wide Fuselage (Radius 6.4)
+  ctx.beginPath();
+  ctx.moveTo(0, -48);
+  ctx.bezierCurveTo(4.8, -48, 6.4, -36, 6.4, -15);
+  ctx.lineTo(6.4, 24);
+  ctx.bezierCurveTo(6.4, 38, 2.8, 48, 0, 52);
+  ctx.bezierCurveTo(-2.8, 48, -6.4, 38, -6.4, 24);
+  ctx.lineTo(-6.4, -15);
+  ctx.bezierCurveTo(-6.4, -36, -4.8, -48, 0, -48);
+  ctx.closePath();
+  const fuseGrad = ctx.createLinearGradient(-6.4, 0, 6.4, 0);
+  fuseGrad.addColorStop(0, '#cbd5e1');
+  fuseGrad.addColorStop(0.2, '#f1f5f9');
+  fuseGrad.addColorStop(0.5, '#ffffff');
+  fuseGrad.addColorStop(1, '#94a3b8');
+  ctx.fillStyle = fuseGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Cockpit Visor
+  ctx.beginPath();
+  ctx.arc(0, -40, 2.8, 0, Math.PI * 2);
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+
+  // Tail Fin in Airline Livery
+  ctx.beginPath();
+  ctx.moveTo(0, 26);
+  ctx.bezierCurveTo(1.6, 30, 2.0, 41, 1.0, 51);
+  ctx.lineTo(-1.0, 51);
+  ctx.bezierCurveTo(-2.0, 41, -1.6, 30, 0, 26);
+  ctx.closePath();
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  drawNavLights(ctx, -51, 51, 16, 51.5);
+}
+
+/**
+ * 3. Commercial Narrowbody Archetype: A320 / B737 (2 Engines, Winglets, Single-Aisle)
+ */
+function drawNarrowbody(ctx: CanvasRenderingContext2D, livery: AirlineLivery) {
+  // Horizontal Stabilizers
+  ctx.beginPath();
+  ctx.moveTo(0, 36);
+  ctx.lineTo(24, 46);
+  ctx.lineTo(22, 50);
+  ctx.lineTo(0, 47);
+  ctx.lineTo(-22, 50);
+  ctx.lineTo(-24, 46);
+  ctx.closePath();
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Swept Wings with Sharklets/Winglets (Span 46)
+  ctx.beginPath();
+  ctx.moveTo(0, -14);
+  ctx.bezierCurveTo(4, -14, 7, -11, 8, -6);
+  ctx.lineTo(46, 14);
+  ctx.lineTo(44, 18);
+  ctx.lineTo(8, 7);
+  ctx.bezierCurveTo(6, 9, 3, 11, 0, 11);
+  ctx.bezierCurveTo(-3, 11, -6, 9, -8, 7);
+  ctx.lineTo(-44, 18);
+  ctx.lineTo(-46, 14);
+  ctx.bezierCurveTo(-7, -11, -4, -14, 0, -14);
+  ctx.closePath();
+  const wingGrad = ctx.createLinearGradient(-46, 0, 46, 0);
+  wingGrad.addColorStop(0, '#e2e8f0');
+  wingGrad.addColorStop(0.5, '#ffffff');
+  wingGrad.addColorStop(1, '#cbd5e1');
+  ctx.fillStyle = wingGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+
+  // Winglet Livery Accent
+  ctx.beginPath();
+  ctx.moveTo(43, 11); ctx.lineTo(46, 14); ctx.lineTo(44, 18); ctx.lineTo(41, 15);
+  ctx.moveTo(-43, 11); ctx.lineTo(-46, 14); ctx.lineTo(-44, 18); ctx.lineTo(-41, 15);
+  ctx.closePath();
+  ctx.fillStyle = livery.accentColor;
+  ctx.fill();
+
+  // 2 Engines under wings
+  drawJetEngine(ctx, 16, 2, 3.8, 8.0);
+  drawJetEngine(ctx, -16, 2, 3.8, 8.0);
+
+  // Single-Aisle Fuselage (Radius 5.2)
+  ctx.beginPath();
+  ctx.moveTo(0, -47);
+  ctx.bezierCurveTo(3.8, -47, 5.2, -35, 5.2, -14);
+  ctx.lineTo(5.2, 23);
+  ctx.bezierCurveTo(5.2, 37, 2.4, 47, 0, 51);
+  ctx.bezierCurveTo(-2.4, 47, -5.2, 37, -5.2, 23);
+  ctx.lineTo(-5.2, -14);
+  ctx.bezierCurveTo(-5.2, -35, -3.8, -47, 0, -47);
+  ctx.closePath();
+  const fuseGrad = ctx.createLinearGradient(-5.2, 0, 5.2, 0);
+  fuseGrad.addColorStop(0, '#cbd5e1');
+  fuseGrad.addColorStop(0.2, '#f1f5f9');
+  fuseGrad.addColorStop(0.5, '#ffffff');
+  fuseGrad.addColorStop(1, '#94a3b8');
+  ctx.fillStyle = fuseGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+
+  // Cockpit Visor
+  ctx.beginPath();
+  ctx.arc(0, -39, 2.4, 0, Math.PI * 2);
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+
+  // Tail Fin in Airline Livery
+  ctx.beginPath();
+  ctx.moveTo(0, 26);
+  ctx.bezierCurveTo(1.4, 30, 1.8, 40, 0.9, 50);
+  ctx.lineTo(-0.9, 50);
+  ctx.bezierCurveTo(-1.8, 40, -1.4, 30, 0, 26);
+  ctx.closePath();
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  drawNavLights(ctx, -45, 45, 16, 50.5);
+}
+
+/**
+ * 4. Regional Jet & BizJet Archetype: CRJ / ERJ / Gulfstream / Citation (Rear Fuselage Engines + T-Tail)
+ */
+function drawRegionalTtail(ctx: CanvasRenderingContext2D, livery: AirlineLivery) {
+  // Clean Swept Wings WITHOUT underwing engines (Span 38)
+  ctx.beginPath();
+  ctx.moveTo(0, -6);
+  ctx.lineTo(38, 14);
+  ctx.lineTo(36, 18);
+  ctx.lineTo(0, 10);
+  ctx.lineTo(-36, 18);
+  ctx.lineTo(-38, 14);
+  ctx.closePath();
+  const wingGrad = ctx.createLinearGradient(-38, 0, 38, 0);
+  wingGrad.addColorStop(0, '#e2e8f0');
+  wingGrad.addColorStop(0.5, '#ffffff');
+  wingGrad.addColorStop(1, '#cbd5e1');
+  ctx.fillStyle = wingGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Wingtip Accents
+  ctx.beginPath();
+  ctx.moveTo(35, 12); ctx.lineTo(38, 14); ctx.lineTo(36, 18); ctx.lineTo(33, 16);
+  ctx.moveTo(-35, 12); ctx.lineTo(-38, 14); ctx.lineTo(-36, 18); ctx.lineTo(-33, 16);
+  ctx.closePath();
+  ctx.fillStyle = livery.accentColor;
+  ctx.fill();
+
+  // 2 Aft Fuselage-Mounted Engines (Distinctive BizJet/CRJ profile)
+  drawJetEngine(ctx, 8.5, 20, 3.2, 7.5);
+  drawJetEngine(ctx, -8.5, 20, 3.2, 7.5);
+
+  // Slender Needle Fuselage (Radius 4.0)
+  ctx.beginPath();
+  ctx.moveTo(0, -48);
+  ctx.bezierCurveTo(2.8, -48, 4.0, -32, 4.0, -10);
+  ctx.lineTo(4.0, 26);
+  ctx.bezierCurveTo(4.0, 38, 2.0, 46, 0, 50);
+  ctx.bezierCurveTo(-2.0, 46, -4.0, 38, -4.0, 26);
+  ctx.lineTo(-4.0, -10);
+  ctx.bezierCurveTo(-4.0, -32, -2.8, -48, 0, -48);
+  ctx.closePath();
+  const fuseGrad = ctx.createLinearGradient(-4.0, 0, 4.0, 0);
+  fuseGrad.addColorStop(0, '#cbd5e1');
+  fuseGrad.addColorStop(0.5, '#ffffff');
+  fuseGrad.addColorStop(1, '#94a3b8');
+  ctx.fillStyle = fuseGrad;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Sharp Cockpit Visor
+  ctx.beginPath();
+  ctx.arc(0, -40, 2.0, 0, Math.PI * 2);
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+
+  // High T-Tail Stabilizer on top of fin
+  ctx.beginPath();
+  ctx.moveTo(0, 43);
+  ctx.lineTo(20, 47);
+  ctx.lineTo(19, 50);
+  ctx.lineTo(0, 48);
+  ctx.lineTo(-19, 50);
+  ctx.lineTo(-20, 47);
+  ctx.closePath();
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
+
+  drawNavLights(ctx, -37, 37, 16, 49.5);
+}
+
+/**
+ * 5. Twin Turboprop Commuter Archetype: ATR-72 / Dash 8 (High Straight Wings, Propeller Discs)
+ */
+function drawTurboprop(ctx: CanvasRenderingContext2D, livery: AirlineLivery) {
+  // High Straight Wings (Span 44)
+  ctx.beginPath();
+  ctx.moveTo(-44, -5);
+  ctx.lineTo(44, -5);
+  ctx.lineTo(42, 3);
+  ctx.lineTo(-42, 3);
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+  ctx.fill();
+
+  // 2 Turboprop Nacelles with Spinning Propeller Discs
+  const drawPropNacelle = (px: number) => {
+    // Engine Nacelle
+    ctx.beginPath();
+    ctx.rect(px - 3, -11, 6, 16);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fill();
+    ctx.strokeStyle = OUTLINE_COLOR;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Propeller Disc (Translucent Spinning Arc)
+    ctx.beginPath();
+    ctx.ellipse(px, -11, 8.5, 2.2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(91, 140, 180, 0.35)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(91, 140, 180, 0.7)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Spinner Cone
+    ctx.beginPath();
+    ctx.arc(px, -12, 1.4, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+  };
+
+  drawPropNacelle(16);
+  drawPropNacelle(-16);
+
+  // Fuselage (Commuter tube)
+  ctx.beginPath();
+  ctx.moveTo(0, -44);
+  ctx.bezierCurveTo(3.4, -44, 4.4, -30, 4.4, -5);
+  ctx.lineTo(4.4, 25);
+  ctx.bezierCurveTo(4.4, 38, 2.0, 46, 0, 49);
+  ctx.bezierCurveTo(-2.0, 46, -4.4, 38, -4.4, 25);
+  ctx.lineTo(-4.4, -5);
+  ctx.bezierCurveTo(-4.4, -30, -3.4, -44, 0, -44);
+  ctx.closePath();
+  ctx.fillStyle = '#f8fafc';
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Tail Fin
+  ctx.beginPath();
+  ctx.moveTo(0, 26);
+  ctx.lineTo(1.2, 48);
+  ctx.lineTo(-1.2, 48);
+  ctx.closePath();
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+
+  // High T-Tail
+  ctx.beginPath();
+  ctx.moveTo(-16, 44); ctx.lineTo(16, 44); ctx.lineTo(15, 47); ctx.lineTo(-15, 47);
+  ctx.closePath();
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  drawNavLights(ctx, -43, 43, -1, 48.5);
+}
+
+/**
+ * 6. Light GA Propeller Archetype: Cessna 172 / Piper / Cirrus (Single Tractor Nose Prop)
+ */
+function drawLightGA(ctx: CanvasRenderingContext2D, livery: AirlineLivery) {
+  // Straight Rectangular Wings (Span 34)
+  ctx.beginPath();
+  ctx.rect(-34, -8, 68, 8);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Wingtips Livery Accent
+  ctx.beginPath();
+  ctx.rect(30, -8, 4, 8);
+  ctx.rect(-34, -8, 4, 8);
+  ctx.fillStyle = livery.accentColor;
+  ctx.fill();
+
+  // Compact Cabin Fuselage
+  ctx.beginPath();
+  ctx.moveTo(0, -34);
+  ctx.bezierCurveTo(2.8, -34, 3.8, -20, 3.8, -4);
+  ctx.lineTo(3.8, 18);
+  ctx.bezierCurveTo(3.8, 30, 1.8, 38, 0, 42);
+  ctx.bezierCurveTo(-1.8, 38, -3.8, 30, -3.8, 18);
+  ctx.lineTo(-3.8, -4);
+  ctx.bezierCurveTo(-3.8, -20, -2.8, -34, 0, -34);
+  ctx.closePath();
+  ctx.fillStyle = '#f1f5f9';
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Single Nose Tractor Propeller
+  ctx.beginPath();
+  ctx.ellipse(0, -36, 11, 2.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(91, 140, 180, 0.4)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(91, 140, 180, 0.8)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Spinner Point
+  ctx.beginPath();
+  ctx.arc(0, -36.5, 1.8, 0, Math.PI * 2);
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+
+  // Small Horizontal Stabilizer
+  ctx.beginPath();
+  ctx.rect(-12, 36, 24, 4);
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  drawNavLights(ctx, -33, 33, -4, 41.5);
+}
+
+/**
+ * 7. Helicopter Archetype: Rotorcraft (Rotor Disc + Tail Boom)
+ */
+function drawHeli(ctx: CanvasRenderingContext2D, livery: AirlineLivery) {
+  // Main Rotor Disc (Spinning 4-blade disc)
+  ctx.beginPath();
+  ctx.arc(0, -4, 34, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(91, 140, 180, 0.12)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(91, 140, 180, 0.4)';
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // 4 Rotor Blades
+  ctx.beginPath();
+  ctx.moveTo(0, -38); ctx.lineTo(0, 30);
+  ctx.moveTo(-34, -4); ctx.lineTo(34, -4);
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Teardrop Cockpit Fuselage
+  ctx.beginPath();
+  ctx.moveTo(0, -26);
+  ctx.bezierCurveTo(5.2, -26, 6.2, -14, 6.2, 0);
+  ctx.bezierCurveTo(6.2, 12, 3.2, 18, 0, 20);
+  ctx.bezierCurveTo(-3.2, 18, -6.2, 12, -6.2, 0);
+  ctx.bezierCurveTo(-6.2, -14, -5.2, -26, 0, -26);
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Cockpit Glass Bubble
+  ctx.beginPath();
+  ctx.arc(0, -18, 4.0, 0, Math.PI * 2);
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+
+  // Rotor Hub
+  ctx.beginPath();
+  ctx.arc(0, -4, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Tail Boom extending aft
+  ctx.beginPath();
+  ctx.moveTo(-1.2, 18);
+  ctx.lineTo(-0.8, 44);
+  ctx.lineTo(0.8, 44);
+  ctx.lineTo(1.2, 18);
+  ctx.closePath();
+  ctx.fillStyle = livery.tailColor;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Tail Rotor
+  ctx.beginPath();
+  ctx.ellipse(3, 44, 2.0, 6.0, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(91, 140, 180, 0.5)';
+  ctx.fill();
+  ctx.strokeStyle = '#5b8cb4';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Red/Green navigation points on skids
+  drawNavLights(ctx, -7, 7, 0, 44);
+}
+
+/**
+ * Renders and caches an aircraft texture based on its archetype, authentic livery, and selection state
+ */
+function getAircraftTexture(
+  category: AircraftCategory,
+  livery: AirlineLivery,
+  isSelected: boolean
+): string {
+  const key = `${category}_${livery.tailColor}_${livery.accentColor}_${isSelected ? '1' : '0'}`;
   if (textureCache[key]) return textureCache[key];
 
   const size = isSelected ? 160 : 128;
@@ -26,359 +767,47 @@ function getAirlinerTexture(altitudeColor: string, isSelected: boolean): string 
   const cx = size / 2;
   const cy = size / 2;
 
-  // 1. Tactical Targeting Reticle & Glowing Beacon Halo (when selected)
+  // 1. Tactical Reticle (when selected)
   if (isSelected) {
-    ctx.save();
-    // Soft outer surveillance halo
-    ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(91, 140, 180, 0.15)';
-    ctx.fill();
-
-    // Sharp steel-blue reticle ring
-    ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.44, 0, Math.PI * 2);
-    ctx.strokeStyle = '#5b8cb4';
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-
-    // Crosshairs with center gap
-    const gap = 16;
-    ctx.beginPath();
-    // Top
-    ctx.moveTo(cx, 8); ctx.lineTo(cx, cy - gap);
-    // Bottom
-    ctx.moveTo(cx, size - 8); ctx.lineTo(cx, cy + gap);
-    // Left
-    ctx.moveTo(8, cy); ctx.lineTo(cx - gap, cy);
-    // Right
-    ctx.moveTo(size - 8, cy); ctx.lineTo(cx + gap, cy);
-    ctx.strokeStyle = '#5b8cb4';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    // 4 Corner brackets
-    const bLen = 10;
-    const bDist = size * 0.42;
-    // Top-Left
-    ctx.beginPath();
-    ctx.moveTo(cx - bDist, cy - bDist + bLen);
-    ctx.lineTo(cx - bDist, cy - bDist);
-    ctx.lineTo(cx - bDist + bLen, cy - bDist);
-    // Top-Right
-    ctx.moveTo(cx + bDist - bLen, cy - bDist);
-    ctx.lineTo(cx + bDist, cy - bDist);
-    ctx.lineTo(cx + bDist, cy - bDist + bLen);
-    // Bottom-Left
-    ctx.moveTo(cx - bDist, cy + bDist - bLen);
-    ctx.lineTo(cx - bDist, cy + bDist);
-    ctx.lineTo(cx - bDist + bLen, cy + bDist);
-    // Bottom-Right
-    ctx.moveTo(cx + bDist - bLen, cy + bDist);
-    ctx.lineTo(cx + bDist, cy + bDist);
-    ctx.lineTo(cx + bDist, cy + bDist - bLen);
-    ctx.strokeStyle = 'rgba(91, 140, 180, 0.85)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.restore();
+    drawReticle(ctx, cx, cy, size);
   }
 
+  // 2. Draw Type-Specific Aircraft Morphology
   ctx.save();
   ctx.translate(cx, cy);
-
-  // Design space is 120 coordinate units (-60 to +60 in X, -60 to +60 in Y)
   const s = size / 120;
   ctx.scale(s, s);
 
-  const outlineColor = '#334155';
-  const redAccent = isSelected ? '#5b8cb4' : '#dc2626';
-  const redShadow = isSelected ? '#3b688c' : '#991b1b';
-
-  // --- 2. HORIZONTAL STABILIZERS (Tail Wings) ---
-  ctx.beginPath();
-  ctx.moveTo(0, 36);
-  ctx.lineTo(26, 47);
-  ctx.lineTo(24, 51);
-  ctx.lineTo(0, 48);
-  ctx.lineTo(-24, 51);
-  ctx.lineTo(-26, 47);
-  ctx.closePath();
-
-  const tailGrad = ctx.createLinearGradient(-26, 47, 26, 47);
-  tailGrad.addColorStop(0, '#e2e8f0');
-  tailGrad.addColorStop(0.5, '#ffffff');
-  tailGrad.addColorStop(1, '#cbd5e1');
-  ctx.fillStyle = tailGrad;
-  ctx.fill();
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-
-  // Tail elevator trim line
-  ctx.beginPath();
-  ctx.moveTo(4, 46); ctx.lineTo(23, 49);
-  ctx.moveTo(-4, 46); ctx.lineTo(-23, 49);
-  ctx.strokeStyle = '#94a3b8';
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-
-  // --- 3. MAIN WINGS (Aerodynamic Swept Wings with Wing Root Fillets) ---
-  ctx.beginPath();
-  ctx.moveTo(0, -14); // forward wing root
-  ctx.bezierCurveTo(4, -14, 8, -12, 10, -7); // right wing root fillet
-  ctx.lineTo(52, 15); // right wingtip leading edge
-  ctx.lineTo(50, 19); // right wingtip trailing edge
-  ctx.lineTo(10, 8); // right wing trailing edge root
-  ctx.bezierCurveTo(7, 10, 4, 12, 0, 12); // right aft blend
-  ctx.bezierCurveTo(-4, 12, -7, 10, -10, 8); // left aft blend
-  ctx.lineTo(-50, 19); // left wingtip trailing edge
-  ctx.lineTo(-52, 15); // left wingtip leading edge
-  ctx.bezierCurveTo(-8, -12, -4, -14, 0, -14); // left wing root fillet
-  ctx.closePath();
-
-  const wingGrad = ctx.createLinearGradient(-52, 0, 52, 0);
-  wingGrad.addColorStop(0, '#e2e8f0');
-  wingGrad.addColorStop(0.2, '#f8fafc');
-  wingGrad.addColorStop(0.5, '#ffffff');
-  wingGrad.addColorStop(0.8, '#f8fafc');
-  wingGrad.addColorStop(1, '#cbd5e1');
-  ctx.fillStyle = wingGrad;
-  ctx.fill();
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  // --- 4. WING ACCENT STRIPES (Bold Dual Bands per Wing matching screenshot) ---
-  const drawWingStripe = (xStart: number, xEnd: number, isRight: boolean) => {
-    ctx.save();
-    ctx.beginPath();
-    if (isRight) {
-      const yL1 = -7 + (xStart - 10) * (22 / 42);
-      const yL2 = -7 + (xEnd - 10) * (22 / 42);
-      const yT2 = 8 + (xEnd - 10) * (11 / 40);
-      const yT1 = 8 + (xStart - 10) * (11 / 40);
-      ctx.moveTo(xStart, yL1);
-      ctx.lineTo(xEnd, yL2);
-      ctx.lineTo(xEnd, yT2);
-      ctx.lineTo(xStart, yT1);
-    } else {
-      const xs = -xStart;
-      const xe = -xEnd;
-      const yL1 = -7 + (xStart - 10) * (22 / 42);
-      const yL2 = -7 + (xEnd - 10) * (22 / 42);
-      const yT2 = 8 + (xEnd - 10) * (11 / 40);
-      const yT1 = 8 + (xStart - 10) * (11 / 40);
-      ctx.moveTo(xs, yL1);
-      ctx.lineTo(xe, yL2);
-      ctx.lineTo(xe, yT2);
-      ctx.lineTo(xs, yT1);
-    }
-    ctx.closePath();
-    ctx.fillStyle = redAccent;
-    ctx.fill();
-    ctx.strokeStyle = redShadow;
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  // Mid-wing stripes
-  drawWingStripe(20, 27, true);
-  drawWingStripe(20, 27, false);
-
-  // Outer wingtip stripes
-  drawWingStripe(36, 44, true);
-  drawWingStripe(36, 44, false);
-
-  // --- 5. FLAP TRACK CANOES (Fairing Pods under Trailing Edges) ---
-  const canoes = [18, 28, -18, -28];
-  for (const cxPos of canoes) {
-    const isR = cxPos > 0;
-    const xAbs = Math.abs(cxPos);
-    const yBase = 8 + (xAbs - 10) * (11 / 40);
-    ctx.beginPath();
-    ctx.ellipse(cxPos, yBase + 1.5, 1.2, 3.2, isR ? 0.05 : -0.05, 0, Math.PI * 2);
-    ctx.fillStyle = '#94a3b8';
-    ctx.fill();
-    ctx.strokeStyle = outlineColor;
-    ctx.lineWidth = 0.6;
-    ctx.stroke();
+  switch (category) {
+    case 'super':
+      drawSuperHeavy(ctx, livery);
+      break;
+    case 'heavy':
+      drawWidebody(ctx, livery);
+      break;
+    case 'regional':
+      drawRegionalTtail(ctx, livery);
+      break;
+    case 'turboprop':
+      drawTurboprop(ctx, livery);
+      break;
+    case 'light':
+      drawLightGA(ctx, livery);
+      break;
+    case 'heli':
+      drawHeli(ctx, livery);
+      break;
+    case 'narrow':
+    default:
+      drawNarrowbody(ctx, livery);
+      break;
   }
-
-  // --- 6. TURBOFAN JET ENGINES (Underwing Pods) ---
-  const drawEngine = (engX: number) => {
-    const engY = 2;
-    // Engine Pylon
-    ctx.beginPath();
-    ctx.rect(engX - 1, engY - 7, 2, 8);
-    ctx.fillStyle = '#64748b';
-    ctx.fill();
-
-    // Engine Nacelle Cowling
-    ctx.beginPath();
-    ctx.ellipse(engX, engY, 4.0, 8.5, 0, 0, Math.PI * 2);
-    const engGrad = ctx.createLinearGradient(engX - 4, engY, engX + 4, engY);
-    engGrad.addColorStop(0, '#cbd5e1');
-    engGrad.addColorStop(0.4, '#ffffff');
-    engGrad.addColorStop(1, '#94a3b8');
-    ctx.fillStyle = engGrad;
-    ctx.fill();
-    ctx.strokeStyle = outlineColor;
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-
-    // Intake Rim & Dark Fan Face
-    ctx.beginPath();
-    ctx.ellipse(engX, engY - 6.5, 3.2, 1.8, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#0f172a';
-    ctx.fill();
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 0.6;
-    ctx.stroke();
-
-    // Titanium Spinner Cone
-    ctx.beginPath();
-    ctx.arc(engX, engY - 6.5, 0.9, 0, Math.PI * 2);
-    ctx.fillStyle = '#f8fafc';
-    ctx.fill();
-
-    // Exhaust Nozzle
-    ctx.beginPath();
-    ctx.ellipse(engX, engY + 7.5, 2.5, 1.5, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#334155';
-    ctx.fill();
-  };
-
-  drawEngine(17);
-  drawEngine(-17);
-
-  // --- 7. STREAMLINED 3D FUSELAGE ---
-  ctx.beginPath();
-  ctx.moveTo(0, -48); // Aerodynamic nose cone tip
-  // Right side of fuselage
-  ctx.bezierCurveTo(4.5, -48, 6.2, -36, 6.2, -15);
-  ctx.lineTo(6.2, 24);
-  ctx.bezierCurveTo(6.2, 38, 2.8, 48, 0, 52); // Tail cone
-  // Left side of fuselage
-  ctx.bezierCurveTo(-2.8, 48, -6.2, 38, -6.2, 24);
-  ctx.lineTo(-6.2, -15);
-  ctx.bezierCurveTo(-6.2, -36, -4.5, -48, 0, -48);
-  ctx.closePath();
-
-  // Cylindrical 3D Volumetric Fuselage Shading
-  const fuseGrad = ctx.createLinearGradient(-6.2, 0, 6.2, 0);
-  fuseGrad.addColorStop(0, '#cbd5e1');
-  fuseGrad.addColorStop(0.2, '#f1f5f9');
-  fuseGrad.addColorStop(0.45, '#ffffff');
-  fuseGrad.addColorStop(0.7, '#f8fafc');
-  fuseGrad.addColorStop(1, '#94a3b8');
-  ctx.fillStyle = fuseGrad;
-  ctx.fill();
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  // Centerline Specular Ridge Highlight
-  ctx.beginPath();
-  ctx.moveTo(0, -45);
-  ctx.lineTo(0, 32);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-
-  // --- 8. COCKPIT WINDSHIELD ("Bandit Mask" Curved Visor) ---
-  ctx.beginPath();
-  ctx.moveTo(0, -43);
-  ctx.bezierCurveTo(3.2, -43, 4.2, -37, 4.2, -34);
-  ctx.lineTo(3.2, -33);
-  ctx.bezierCurveTo(2.2, -35, 1.0, -36.5, 0, -36.5);
-  ctx.bezierCurveTo(-1.0, -36.5, -2.2, -35, -3.2, -33);
-  ctx.lineTo(-4.2, -34);
-  ctx.bezierCurveTo(-4.2, -37, -3.2, -43, 0, -43);
-  ctx.closePath();
-  ctx.fillStyle = '#090d16';
-  ctx.fill();
-  ctx.strokeStyle = '#1e293b';
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-
-  // Cockpit glass reflection arc
-  ctx.beginPath();
-  ctx.arc(0, -38, 2.5, Math.PI * 1.1, Math.PI * 1.9);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-
-  // --- 9. PASSENGER CABIN WINDOWS (Dual Rows) ---
-  const winYStart = -28;
-  const winYEnd = 24;
-  const winCount = 18;
-  for (let i = 0; i < winCount; i++) {
-    const wy = winYStart + (i / (winCount - 1)) * (winYEnd - winYStart);
-    // Port window
-    ctx.beginPath();
-    ctx.arc(-4.6, wy, 0.45, 0, Math.PI * 2);
-    ctx.fillStyle = '#334155';
-    ctx.fill();
-
-    // Starboard window
-    ctx.beginPath();
-    ctx.arc(4.6, wy, 0.45, 0, Math.PI * 2);
-    ctx.fillStyle = '#334155';
-    ctx.fill();
-  }
-
-  // --- 10. DORSAL TAIL FIN & RED ACCENT STRIPE ---
-  ctx.beginPath();
-  ctx.moveTo(0, 26);
-  ctx.bezierCurveTo(1.4, 30, 1.8, 40, 0.8, 50);
-  ctx.lineTo(-0.8, 50);
-  ctx.bezierCurveTo(-1.8, 40, -1.4, 30, 0, 26);
-  ctx.closePath();
-  ctx.fillStyle = redAccent;
-  ctx.fill();
-  ctx.strokeStyle = redShadow;
-  ctx.lineWidth = 0.6;
-  ctx.stroke();
-
-  // --- 11. NAVIGATION LIGHTS (ICAO Standard Port Red, Starboard Green, Tail Strobe) ---
-  // Left Wingtip (Port Red)
-  ctx.beginPath();
-  ctx.arc(-51, 17, 1.8, 0, Math.PI * 2);
-  ctx.fillStyle = '#ef4444';
-  ctx.shadowColor = '#ef4444';
-  ctx.shadowBlur = 6;
-  ctx.fill();
-
-  // Right Wingtip (Starboard Green)
-  ctx.beginPath();
-  ctx.arc(51, 17, 1.8, 0, Math.PI * 2);
-  ctx.fillStyle = '#10b981';
-  ctx.shadowColor = '#10b981';
-  ctx.shadowBlur = 6;
-  ctx.fill();
-
-  // Tail Strobe (White Beacon)
-  ctx.beginPath();
-  ctx.arc(0, 51.5, 1.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.shadowColor = '#ffffff';
-  ctx.shadowBlur = 6;
-  ctx.fill();
 
   ctx.restore();
 
   const dataUrl = canvas.toDataURL();
   textureCache[key] = dataUrl;
   return dataUrl;
-}
-
-function getAltitudeColor(altitudeFeet: number): string {
-  if (altitudeFeet >= 30000) return '#00f0ff'; // Cruising: High electric cyan
-  if (altitudeFeet >= 18000) return '#38bdf8'; // Mid-high: Sky blue
-  if (altitudeFeet >= 10000) return '#10b981'; // Mid: Emerald green
-  if (altitudeFeet >= 3000) return '#f59e0b'; // Low climb/approach: Amber
-  return '#f43f5e'; // Very low / ground: Rose / Coral
 }
 
 export class AircraftLayer {
@@ -400,13 +829,13 @@ export class AircraftLayer {
       viewer.camera.positionWC
     );
 
-    // Create hardware-instanced BillboardCollection
+    // Hardware-instanced BillboardCollection
     this.billboardCollection = new Cesium.BillboardCollection({
       scene: viewer.scene,
     });
     viewer.scene.primitives.add(this.billboardCollection);
 
-    // Create hardware-instanced LabelCollection for callsigns
+    // Hardware-instanced LabelCollection for callsigns
     this.labelCollection = new Cesium.LabelCollection({
       scene: viewer.scene,
     });
@@ -418,29 +847,50 @@ export class AircraftLayer {
   private setupPicking() {
     this.eventHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
 
-    // Left click to select aircraft
     this.eventHandler.setInputAction((movement: { position: Cesium.Cartesian2 }) => {
-      const picked = this.viewer.scene.pick(movement.position);
-      if (Cesium.defined(picked) && picked.id && typeof picked.id === 'string') {
-        this.onSelectAircraft(picked.id);
-      } else {
-        this.onSelectAircraft(null);
-      }
-    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+      const pickedObject = this.viewer.scene.pick(movement.position);
 
-    // Hover cursor styling
-    this.eventHandler.setInputAction((movement: { endPosition: Cesium.Cartesian2 }) => {
-      const picked = this.viewer.scene.pick(movement.endPosition);
-      if (Cesium.defined(picked) && picked.id) {
-        this.viewer.canvas.style.cursor = 'pointer';
-      } else {
-        this.viewer.canvas.style.cursor = 'default';
+      if (Cesium.defined(pickedObject) && pickedObject.id) {
+        const id = typeof pickedObject.id === 'string' ? pickedObject.id : pickedObject.id?.id;
+        if (id && this.billboards.has(id)) {
+          this.onSelectAircraft(id);
+          return;
+        }
       }
-    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+      // Ray-cast against billboards within a 24px fuzzy touch radius
+      const pickRay = this.viewer.camera.getPickRay(movement.position);
+      if (pickRay) {
+        let closestId: string | null = null;
+        let closestDist = 24.0;
+
+        for (const [id, bb] of this.billboards.entries()) {
+          if (!bb.show) continue;
+          const winPos = Cesium.SceneTransforms.worldToWindowCoordinates(
+            this.viewer.scene,
+            bb.position
+          );
+          if (winPos) {
+            const dist = Cesium.Cartesian2.distance(winPos, movement.position);
+            if (dist < closestDist) {
+              closestDist = dist;
+              closestId = id;
+            }
+          }
+        }
+
+        if (closestId) {
+          this.onSelectAircraft(closestId);
+          return;
+        }
+      }
+
+      this.onSelectAircraft(null);
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   }
 
   /**
-   * Batch updates all aircraft billboards & callsign labels in a single frame
+   * Batch updates all aircraft billboards & callsign labels at 60 FPS
    */
   public update(aircraftList: NormalizedAircraft[], selectedId: string | null) {
     if (!this.viewer || this.viewer.isDestroyed()) return;
@@ -451,21 +901,25 @@ export class AircraftLayer {
     for (const ac of aircraftList) {
       activeIds.add(ac.id);
       const isSelected = ac.id === selectedId;
-      const color = getAltitudeColor(ac.position.altitudeFeet);
-      const textureKey = `${color}_${isSelected ? '1' : '0'}`;
-      const textureUrl = getAirlinerTexture(color, isSelected);
 
-      // Convert WGS84 coordinates (lon, lat, altMeters) to Cesium Cartesian3
+      // Extract real aircraft archetype details and authentic airline livery
+      const categoryDetails = getAircraftCategoryDetails(ac.aircraftType);
+      const livery = getAirlineLivery(ac.callsign, ac.operator);
+      const textureKey = `${categoryDetails.category}_${livery.tailColor}_${livery.accentColor}_${isSelected ? '1' : '0'}`;
+      const textureUrl = getAircraftTexture(categoryDetails.category, livery, isSelected);
+      const targetScale = isSelected ? categoryDetails.selectedScale : categoryDetails.baseScale;
+
+      // Convert coordinates (lon, lat, altMeters) to Cesium Cartesian3
       const position = Cesium.Cartesian3.fromDegrees(
         ac.position.longitude,
         ac.position.latitude,
         ac.position.altitudeMeters
       );
 
-      // Horizon Occlusion Culling: Check if aircraft is on visible side of the 3D globe
+      // Horizon Occlusion Culling
       const isVisible = this.occluder.isPointVisible(position);
 
-      // Surface-locked heading: align aircraft rotation with True North on the screen
+      // Surface-locked heading
       let finalRotation = -Cesium.Math.toRadians(ac.movement.heading);
       if (isVisible) {
         const posNorth = Cesium.Cartesian3.fromDegrees(
@@ -484,7 +938,7 @@ export class AircraftLayer {
         }
       }
 
-      // --- 1. Authentic Airliner Billboard Marker ---
+      // --- 1. Type-Accurate Airplane Billboard Marker ---
       let billboard = this.billboards.get(ac.id);
 
       if (!billboard) {
@@ -493,7 +947,7 @@ export class AircraftLayer {
           image: textureUrl,
           rotation: finalRotation,
           alignedAxis: Cesium.Cartesian3.ZERO,
-          scale: isSelected ? 0.52 : 0.42,
+          scale: targetScale,
           id: ac.id,
           show: isVisible,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -507,29 +961,26 @@ export class AircraftLayer {
         billboard.position = position;
         billboard.rotation = finalRotation;
 
-        // ONLY update image and scale when selection/texture actually changes!
+        // ONLY update texture and scale when selection or type actually changes
         if (billboard._currentTextureKey !== textureKey) {
           billboard.image = textureUrl;
-          billboard.scale = isSelected ? 0.52 : 0.42;
+          billboard.scale = targetScale;
           billboard._currentTextureKey = textureKey;
         }
       }
 
-      // --- 2. High-Legibility Callsign Radar Label (2x Supersampled) ---
+      // --- 2. High-Legibility Callsign Radar Label ---
       let label = this.labels.get(ac.id) as AircraftLabel | undefined;
       const labelText = ac.callsign || ac.id.toUpperCase();
 
       const labelOffset = isSelected
-        ? new Cesium.Cartesian2(0, 52) // Outside the tactical cyan targeting reticle
-        : new Cesium.Cartesian2(0, 36); // Cleanly below the aircraft tail
+        ? new Cesium.Cartesian2(0, 52)
+        : new Cesium.Cartesian2(0, 36);
 
-      // Distance-based LOD: Only show labels for all flights when camera is within 2,200 km (prevents solid black wall over Europe)
-      // Selected aircraft label is ALWAYS visible at any zoom distance
       const displayCondition = isSelected
         ? new Cesium.DistanceDisplayCondition(0, Number.MAX_VALUE)
         : new Cesium.DistanceDisplayCondition(0, 2200000);
 
-      // Render at 24px/22px and downscale by 0.5 for razor-sharp 2x retina typography
       const labelFont = isSelected
         ? '700 24px "JetBrains Mono", monospace'
         : '600 22px "JetBrains Mono", monospace';
@@ -538,7 +989,6 @@ export class AircraftLayer {
         ? Cesium.Color.fromCssColorString('#d8dfe8')
         : Cesium.Color.fromCssColorString('#8893a4');
 
-      // Calibrated low-contrast slate glass background
       const labelBgColor = isSelected
         ? Cesium.Color.fromCssColorString('rgba(17, 21, 29, 0.95)')
         : Cesium.Color.fromCssColorString('rgba(12, 15, 20, 0.85)');
@@ -554,9 +1004,9 @@ export class AircraftLayer {
           font: labelFont,
           scale: 0.5,
           fillColor: labelFillColor,
-          style: Cesium.LabelStyle.FILL, // Pure clean vector fill without choking outline stroke
+          style: Cesium.LabelStyle.FILL,
           pixelOffset: labelOffset,
-          eyeOffset: new Cesium.Cartesian3(0, 0, -10), // Always render in front of aircraft billboard
+          eyeOffset: new Cesium.Cartesian3(0, 0, -10),
           show: isVisible,
           showBackground: true,
           backgroundColor: labelBgColor,
@@ -572,7 +1022,6 @@ export class AircraftLayer {
         label.position = position;
         if (label.text !== labelText) label.text = labelText;
 
-        // ONLY update style, font, colors and offsets when selection state actually changes (prevents 60 FPS texture atlas thrashing)
         if (label._isCurrentlySelected !== isSelected) {
           label.font = labelFont;
           label.scale = 0.5;

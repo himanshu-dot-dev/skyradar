@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { X, Crosshair, Eye } from 'lucide-react';
 import { useAircraftStore } from '../../store/aircraftStore';
 import { formatAltitude, headingToCompass } from '../../utils/geoMath';
+import { getAircraftCategoryDetails, getAirlineLivery } from '../../utils/aircraftClassification';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
 
 interface AircraftTelemetryCardProps {
@@ -47,6 +48,8 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
   const callsign = selectedAircraft.callsign || selectedAircraft.id.toUpperCase();
   const operator = selectedAircraft.operator || (selectedAircraft.isSimulated ? 'Corridor Flight' : 'En-route');
   const modelText = selectedAircraft.modelDescription || selectedAircraft.aircraftType || 'Commercial Airliner';
+  const categoryDetails = getAircraftCategoryDetails(selectedAircraft.aircraftType);
+  const livery = getAirlineLivery(selectedAircraft.callsign, selectedAircraft.operator);
 
   return (
     <aside className="inspector-panel">
@@ -55,7 +58,10 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
         <div className="mobile-drag-handle" />
         <div className="inspector-header-top">
           <div className="inspector-title-col">
-            <span className="inspector-callsign font-mono">{callsign}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="inspector-callsign font-mono">{callsign}</span>
+              <span className="airframe-badge font-mono">{categoryDetails.shortTag}</span>
+            </div>
             <span className="inspector-sub">
               {operator} • {selectedAircraft.aircraftType || 'Aviation'}
             </span>
@@ -169,6 +175,27 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
         <div className="spec-row">
           <span className="spec-key">Aircraft Model</span>
           <span className="spec-val">{modelText}</span>
+        </div>
+        <div className="spec-row">
+          <span className="spec-key">Airframe Class</span>
+          <span className="spec-val font-mono">{categoryDetails.label}</span>
+        </div>
+        <div className="spec-row">
+          <span className="spec-key">Operator / Livery</span>
+          <span className="spec-val" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: livery.tailColor,
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                flexShrink: 0,
+              }}
+            />
+            <span>{livery.name}</span>
+          </span>
         </div>
         <div className="spec-row">
           <span className="spec-key">Registration</span>

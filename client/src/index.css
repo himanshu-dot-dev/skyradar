@@ -495,6 +495,21 @@ html, body, #root {
   letter-spacing: 0.02em;
 }
 
+.airframe-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: var(--surface-3);
+  padding: 2px 6px;
+  border-radius: 2px;
+  color: var(--accent-blue);
+  border: 1px solid var(--border-medium);
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+}
+
 .inspector-sub {
   font-size: 11px;
   color: var(--text-medium);
