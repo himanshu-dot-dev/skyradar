@@ -4,7 +4,6 @@ import { GlobeToolbar } from './components/Controls/GlobeToolbar';
 import { Header } from './components/Header/Header';
 import { AircraftTelemetryCard } from './components/Sidebar/AircraftTelemetryCard';
 import { AircraftSearchDrawer } from './components/Sidebar/AircraftSearchDrawer';
-import { Navigation, Plane } from 'lucide-react';
 import { useAircraftStore } from './store/aircraftStore';
 
 export const App: React.FC = () => {

@@ -79,7 +79,6 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
   const imageryLayer = useGlobeStore((s) => s.imageryLayer);
   const enableLighting = useGlobeStore((s) => s.enableLighting);
   const showAtmosphere = useGlobeStore((s) => s.showAtmosphere);
-  const showFlightPaths = useGlobeStore((s) => s.showFlightPaths);
   const selectedHub = useGlobeStore((s) => s.selectedHub);
 
   // Initialize Cesium Viewer, Aircraft Layer & Flight Path Layer

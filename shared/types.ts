@@ -62,25 +62,6 @@ export interface NormalizedAircraft {
   isSimulated: boolean;
 }
 
-export interface AircraftPositionHistoryPoint {
-  latitude: number;
-  longitude: number;
-  altitudeMeters: number;
-  timestamp: number;
-}
-
-export interface AircraftFilterOptions {
-  searchQuery: string; // Filter by callsign, reg, or hex
-  minAltitudeFeet: number;
-  maxAltitudeFeet: number;
-  minSpeedKnots: number;
-  maxSpeedKnots: number;
-  aircraftTypeCategory?: string;
-  showSimulated: boolean;
-  showLive: boolean;
-  emergencyOnly: boolean;
-}
-
 export interface SystemStatus {
   totalAircraftCount: number;
   liveAircraftCount: number;

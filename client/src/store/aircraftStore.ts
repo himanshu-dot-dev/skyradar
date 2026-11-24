@@ -196,9 +196,9 @@ export const useAircraftStore = create<AircraftStoreState>((set) => ({
     })),
 
   resetFilters: () =>
-    set((state) => ({
+    set({
       filters: DEFAULT_FILTERS,
-    })),
+    }),
 
   setDrawerOpen: (open) => set({ isDrawerOpen: open }),
 

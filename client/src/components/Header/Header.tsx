@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Plane, Search, Radio } from 'lucide-react';
+import { Clock, Plane } from 'lucide-react';
 import { useAircraftStore } from '../../store/aircraftStore';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
 

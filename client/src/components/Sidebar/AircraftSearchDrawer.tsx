@@ -11,11 +11,9 @@ import {
   ArrowDownRight,
   Minus,
   AlertTriangle,
-  Radio,
   Eye,
-  Filter,
 } from 'lucide-react';
-import { useAircraftStore, matchesFilters, type AircraftFilters } from '../../store/aircraftStore';
+import { useAircraftStore, matchesFilters } from '../../store/aircraftStore';
 import { formatAltitude, headingToCompass, getAltitudeColor } from '../../utils/geoMath';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
 import type { NormalizedAircraft } from '@shared/types';
