@@ -9,8 +9,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = () => {
   const [utcTime, setUtcTime] = useState<string>('');
   const totalCount = useAircraftStore((s) => s.totalCount);
-  const isSimulatedMode = useAircraftStore((s) => s.isSimulatedMode);
-  const setSimulatedMode = useAircraftStore((s) => s.setSimulatedMode);
 
   // Aviation ZULU Clock (UTC)
   useEffect(() => {
@@ -59,28 +57,6 @@ export const Header: React.FC<HeaderProps> = () => {
         <div className="flight-counter">
           <span className="num font-mono">{totalCount > 0 ? totalCount.toLocaleString() : '0'}</span>
           <span className="label">Flights</span>
-        </div>
-
-        <div className="header-divider" />
-
-        {/* Segmented Mode Switcher [ LIVE | SIM ] */}
-        <div className="mode-switch">
-          <button
-            className={`mode-tab ${!isSimulatedMode ? 'active' : ''}`}
-            onClick={() => setSimulatedMode(false)}
-            title="Live ADS-B Radar tracking feed"
-          >
-            <span className="mode-dot live" />
-            <span>LIVE</span>
-          </button>
-          <button
-            className={`mode-tab ${isSimulatedMode ? 'active' : ''}`}
-            onClick={() => setSimulatedMode(true)}
-            title="Simulated Global Corridor flight feed"
-          >
-            <span className="mode-dot sim" />
-            <span>SIM</span>
-          </button>
         </div>
       </div>
 

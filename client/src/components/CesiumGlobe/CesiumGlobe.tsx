@@ -284,20 +284,13 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
     liveTrafficRef.current = liveTraffic;
 
     // Initial populate: Boot directly into live ADS-B by default!
-    if (!useAircraftStore.getState().isSimulatedMode) {
-      liveTraffic.fetchLive().then((list) => {
-        if (!viewer || viewer.isDestroyed()) return;
-        const validList = list && list.length > 0 ? list : simTraffic.update(0);
-        useAircraftStore.getState().setAircraftList(validList);
-        aircraftLayer.update(validList, null);
-        flightPathLayer.update(validList, null, useGlobeStore.getState().showFlightPaths);
-      });
-    } else {
-      const initialList = simTraffic.update(0);
-      useAircraftStore.getState().setAircraftList(initialList);
-      aircraftLayer.update(initialList, null);
-      flightPathLayer.update(initialList, null, useGlobeStore.getState().showFlightPaths);
-    }
+    liveTraffic.fetchLive().then((list) => {
+      if (!viewer || viewer.isDestroyed()) return;
+      const validList = list && list.length > 0 ? list : simTraffic.update(0);
+      useAircraftStore.getState().setAircraftList(validList);
+      aircraftLayer.update(validList, null);
+      flightPathLayer.update(validList, null, useGlobeStore.getState().showFlightPaths);
+    });
 
     // Animation Loop: updates aircraft position, dotted paths & camera follow
     const loop = (currentTime: number) => {
@@ -306,24 +299,15 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
       const deltaSeconds = Math.min((currentTime - lastTimeRef.current) / 1000, 0.1);
       lastTimeRef.current = currentTime;
 
-      const isSimMode = useAircraftStore.getState().isSimulatedMode;
-      let updatedList: NormalizedAircraft[];
-
-      if (isSimMode) {
-        updatedList = simTraffic.update(deltaSeconds);
-      } else {
-        // Poll backend live feed every 6.5s
-        if (currentTime - lastLivePollRef.current > 6500) {
-          lastLivePollRef.current = currentTime;
-          liveTraffic.fetchLive();
-        }
-        const liveList = liveTraffic.getAircraftList();
-        if (liveList.length > 0) {
-          updatedList = liveTraffic.updatePositions(deltaSeconds);
-        } else {
-          updatedList = simTraffic.update(deltaSeconds);
-        }
+      // Poll backend live feed every 6.5s
+      if (currentTime - lastLivePollRef.current > 6500) {
+        lastLivePollRef.current = currentTime;
+        liveTraffic.fetchLive();
       }
+      const liveList = liveTraffic.getAircraftList();
+      const updatedList = liveList.length > 0
+        ? liveTraffic.updatePositions(deltaSeconds)
+        : simTraffic.update(deltaSeconds);
 
       const currentSelectedId = useAircraftStore.getState().selectedAircraftId;
       const followingActive = useAircraftStore.getState().isFollowing;

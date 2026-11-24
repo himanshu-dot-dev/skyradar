@@ -82,7 +82,6 @@ interface AircraftStoreState {
   selectedAircraftId: string | null;
   selectedAircraft: NormalizedAircraft | null;
   isFollowing: boolean;
-  isSimulatedMode: boolean;
   totalCount: number;
   liveCount: number;
   simulatedCount: number;
@@ -95,7 +94,6 @@ interface AircraftStoreState {
   selectAircraft: (id: string | null) => void;
   toggleFollow: () => void;
   setFollowing: (following: boolean) => void;
-  setSimulatedMode: (enabled: boolean) => void;
   clearSelection: () => void;
 
   setSearchQuery: (query: string) => void;
@@ -111,7 +109,6 @@ export const useAircraftStore = create<AircraftStoreState>((set) => ({
   selectedAircraftId: null,
   selectedAircraft: null,
   isFollowing: false,
-  isSimulatedMode: false,
   totalCount: 0,
   liveCount: 0,
   simulatedCount: 0,
@@ -173,8 +170,6 @@ export const useAircraftStore = create<AircraftStoreState>((set) => ({
     set((state) => ({
       isFollowing: state.selectedAircraftId ? following : false,
     })),
-
-  setSimulatedMode: (enabled) => set({ isSimulatedMode: enabled }),
 
   clearSelection: () =>
     set({

@@ -177,51 +177,6 @@ html, body, #root {
   letter-spacing: 0.05em;
 }
 
-/* Segmented Mode Switcher [ LIVE | SIM ] */
-.mode-switch {
-  display: flex;
-  background: var(--surface-2);
-  border-radius: 3px;
-  padding: 2px;
-  gap: 2px;
-}
-
-.mode-tab {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 2px;
-  cursor: pointer;
-  transition: all 0.12s;
-}
-.mode-tab:hover {
-  color: var(--text-high);
-}
-.mode-tab.active {
-  background: var(--surface-3);
-  color: var(--text-high);
-}
-
-.mode-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--text-muted);
-}
-.mode-tab.active .mode-dot.live {
-  background: var(--accent-green);
-}
-.mode-tab.active .mode-dot.sim {
-  background: var(--accent-amber);
-}
-
 .header-right {
   display: flex;
   align-items: center;
@@ -825,13 +780,6 @@ html, body, #root {
   .flight-counter {
     font-size: 11px;
   }
-  .mode-switch {
-    padding: 1px;
-  }
-  .mode-tab {
-    padding: 2px 6px;
-    font-size: 9px;
-  }
   .utc-clock {
     font-size: 10px;
     padding: 2px 6px;
@@ -953,11 +901,5 @@ html, body, #root {
   }
   .header-left {
     gap: 6px;
-  }
-  .mode-tab {
-    padding: 2px 5px;
-  }
-  .mode-tab span:last-child {
-    font-size: 9px;
   }
 }
