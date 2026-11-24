@@ -114,7 +114,7 @@ export const useAircraftStore = create<AircraftStoreState>((set) => ({
   simulatedCount: 0,
 
   filters: DEFAULT_FILTERS,
-  isDrawerOpen: typeof window !== 'undefined' ? window.innerWidth > 768 : true,
+  isDrawerOpen: false,
 
   setAircraftList: (list) => {
     const map = new Map<string, NormalizedAircraft>();

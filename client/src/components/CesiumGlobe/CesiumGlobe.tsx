@@ -250,12 +250,12 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
       }
     }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
-    // Initial Camera Position: Focused view of Atlantic & European flight tracks (9,000 km altitude)
+    // Initial Camera Position: Full centered globe view
     viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(-15.0, 48.0, 9000000),
+      destination: Cesium.Cartesian3.fromDegrees(10.0, 12.0, 22500000),
       orientation: {
         heading: Cesium.Math.toRadians(0),
-        pitch: Cesium.Math.toRadians(-88),
+        pitch: Cesium.Math.toRadians(-89.9),
         roll: 0,
       },
     });
@@ -361,13 +361,13 @@ export const CesiumGlobe: React.FC<CesiumGlobeProps> = ({ onViewerReady }) => {
           wasFollowingRef.current = false;
         }
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(-15.0, 48.0, 9000000),
+          destination: Cesium.Cartesian3.fromDegrees(10.0, 12.0, 22500000),
           orientation: {
             heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(-88),
+            pitch: Cesium.Math.toRadians(-89.9),
             roll: 0,
           },
-          duration: 2.2,
+          duration: 2.0,
         });
       },
       flyToHub: (lat: number, lon: number, height = 180000) => {
