@@ -146,7 +146,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
         title={enableLighting ? 'Disable Sun Shadow' : 'Enable Real-time Sun Shadow'}
         onClick={toggleLighting}
       >
-        <Sun size={15} color={enableLighting ? 'var(--accent-amber)' : 'inherit'} />
+        <Sun size={15} />
       </button>
 
       {/* Satellite Imagery Menu Toggle */}
