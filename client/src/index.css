@@ -1,19 +1,51 @@
-/* Modern Dark Aviation Radar Theme */
+/* ==========================================================================
+   SKYRADAR AERO SLATE DESIGN SYSTEM
+   Calibrated low-contrast slate surfaces, whisper hairlines, and titanium text.
+   ========================================================================== */
+
 :root {
-  --bg-space: #030712;
-  --bg-panel: rgba(8, 15, 30, 0.78);
-  --bg-panel-hover: rgba(14, 25, 48, 0.88);
-  --border-cyan: rgba(0, 240, 255, 0.22);
-  --border-cyan-active: rgba(0, 240, 255, 0.65);
-  --accent-cyan: #00f0ff;
-  --accent-blue: #38bdf8;
-  --accent-emerald: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-rose: #f43f5e;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Calibrated Low-Contrast Slate Surfaces (No Pitch Black, Zero Glare) */
+  --bg-base: #0c0f14;
+  --surface-1: #11151d;
+  --surface-2: #161b24;
+  --surface-3: #1c222e;
+  --surface-hover: #222938;
+
+  /* Whisper Hairline Dividers */
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-medium: rgba(255, 255, 255, 0.09);
+  --border-active: rgba(91, 140, 180, 0.4);
+
+  /* Human-Calibrated Eye-Comfort Typography */
+  --text-high: #d8dfe8;     /* Soft titanium white (~85% luminance, 0 glare) */
+  --text-medium: #8893a4;   /* Balanced reading slate */
+  --text-muted: #556070;    /* Secondary metadata */
+
+  /* Muted Status Accents (Used ONLY for Status, Never Decoration) */
+  --accent-blue: #5b8cb4;   /* Aero steel-blue */
+  --accent-green: #349e6f;  /* Live signal status */
+  --accent-amber: #b88636;  /* Simulated / Caution */
+  --accent-red: #b83c48;    /* Emergency 7700 */
+
+  /* Dimensions */
+  --header-height: 44px;
+  --sidebar-width: 320px;
+  --sidebar-rail-width: 48px;
+  --inspector-width: 360px;
+
+  /* Backward Compatibility Mappings */
+  --bg-space: var(--bg-base);
+  --bg-panel: var(--surface-1);
+  --bg-panel-hover: var(--surface-hover);
+  --border-cyan: var(--border-subtle);
+  --border-cyan-active: var(--border-active);
+  --accent-cyan: var(--accent-blue);
+  --accent-emerald: var(--accent-green);
+  --accent-rose: var(--accent-red);
+  --text-primary: var(--text-high);
+  --text-secondary: var(--text-medium);
+
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -27,10 +59,11 @@ html, body, #root {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background-color: var(--bg-space);
-  color: var(--text-primary);
+  background-color: var(--bg-base);
+  color: var(--text-high);
   font-family: var(--font-sans);
   user-select: none;
+  -webkit-user-select: none;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -54,7 +87,7 @@ html, body, #root {
 /* Minimize Cesium Attribution */
 .cesium-viewer .cesium-widget-credits {
   font-size: 10px !important;
-  opacity: 0.55;
+  opacity: 0.35;
   transition: opacity 0.2s;
   z-index: 10;
   right: 12px !important;
@@ -67,94 +100,701 @@ html, body, #root {
 }
 
 .cesium-viewer .cesium-widget-credits:hover {
-  opacity: 0.95;
-}
-
-/* Radar Blip Animation */
-@keyframes radar-pulse {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.7);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 8px rgba(0, 240, 255, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(0, 240, 255, 0);
-  }
-}
-
-.radar-indicator {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--accent-cyan);
-  animation: radar-pulse 2s infinite ease-out;
-}
-
-/* Glassmorphic Panel Styles */
-.glass-panel {
-  background: var(--bg-panel);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--border-cyan);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
-  border-radius: 10px;
-}
-
-.glass-btn {
-  background: rgba(15, 23, 42, 0.65);
-  border: 1px solid var(--border-cyan);
-  color: var(--text-primary);
-  border-radius: 6px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  font-family: var(--font-sans);
-}
-
-.glass-btn:hover {
-  background: rgba(0, 240, 255, 0.15);
-  border-color: var(--border-cyan-active);
-  box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
-}
-
-.glass-btn:active {
-  transform: scale(0.97);
-}
-
-.glass-btn.active {
-  background: rgba(0, 240, 255, 0.22);
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+  opacity: 0.85;
 }
 
 /* Monospace Numbers & Telemetry */
 .font-mono {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Custom Scrollbar for sidebars */
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(3, 7, 18, 0.4);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.25);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 240, 255, 0.5);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* ==========================================================================
+   1. TOP HEADER (Header.tsx)
+   ========================================================================== */
+.top-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 30;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-high);
+}
+.brand-logo svg {
+  color: var(--accent-blue);
+}
+
+.header-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle);
+}
+
+.flight-counter {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.flight-counter .num {
+  font-weight: 700;
+  color: var(--text-high);
+}
+.flight-counter .label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Segmented Mode Switcher [ LIVE | SIM ] */
+.mode-switch {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 3px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.mode-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.mode-tab:hover {
+  color: var(--text-high);
+}
+.mode-tab.active {
+  background: var(--surface-3);
+  color: var(--text-high);
+}
+
+.mode-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.mode-tab.active .mode-dot.live {
+  background: var(--accent-green);
+}
+.mode-tab.active .mode-dot.sim {
+  background: var(--accent-amber);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.utc-clock {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-medium);
+  background: var(--surface-2);
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+}
+
+/* ==========================================================================
+   2. LEFT FLIGHT DIRECTORY (AircraftSearchDrawer.tsx)
+   ========================================================================== */
+.sidebar-panel {
+  position: absolute;
+  top: var(--header-height);
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  background: var(--surface-1);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  z-index: 25;
+  transition: width 0.18s ease;
+  overflow: hidden;
+}
+
+.sidebar-panel.collapsed {
+  width: var(--sidebar-rail-width);
+}
+
+.sidebar-rail-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 10px;
+}
+
+.rail-icon-btn {
+  width: 32px;
+  height: 32px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--text-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.rail-icon-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-high);
+}
+
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sidebar-top {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-medium);
+}
+
+.collapse-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+}
+.collapse-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-high);
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-box svg {
+  position: absolute;
+  left: 8px;
+  color: var(--text-muted);
+}
+.search-box input {
+  width: 100%;
+  height: 28px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 0 24px 0 26px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-high);
+  outline: none;
+  transition: border-color 0.12s;
+}
+.search-box input:focus {
+  border-color: var(--border-active);
+}
+.search-box .clear-btn {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+.search-box .clear-btn:hover {
+  color: var(--text-high);
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-2);
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.filter-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 0;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.12s;
+}
+.filter-btn:hover {
+  color: var(--text-high);
+}
+.filter-btn.active {
+  background: var(--surface-3);
+  color: var(--text-high);
+}
+
+.flight-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flight-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-left: 2px solid transparent;
+}
+.flight-row:hover {
+  background: var(--surface-2);
+}
+.flight-row.selected {
+  background: var(--surface-2);
+  border-left-color: var(--accent-blue);
+}
+
+.flight-col-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.flight-callsign-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.callsign-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-high);
+}
+
+.type-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.operator-text {
+  font-size: 11px;
+  color: var(--text-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+}
+
+.route-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.flight-col-metrics {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.fl-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--surface-2);
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: var(--text-high);
+  border: 1px solid var(--border-subtle);
+}
+
+.speed-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ==========================================================================
+   3. RIGHT TELEMETRY INSPECTOR (AircraftTelemetryCard.tsx)
+   ========================================================================== */
+.inspector-panel {
+  position: absolute;
+  top: var(--header-height);
+  bottom: 0;
+  right: 0;
+  width: var(--inspector-width);
+  background: var(--surface-1);
+  border-left: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  z-index: 25;
+  overflow-y: auto;
+  transition: transform 0.18s ease, opacity 0.15s;
+}
+
+.inspector-header {
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.inspector-title-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inspector-callsign {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-high);
+  letter-spacing: 0.02em;
+}
+
+.inspector-sub {
+  font-size: 11px;
+  color: var(--text-medium);
+}
+
+.close-inspector-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+}
+.close-inspector-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-high);
+}
+
+/* Gate-to-Gate Route Strip */
+.route-strip {
+  padding: 12px 14px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.route-endpoints {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.endpoint-code {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-high);
+}
+
+.endpoint-city {
+  font-size: 10px;
+  color: var(--text-muted);
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.endpoint-city.right {
+  text-align: right;
+}
+
+.route-progress-track {
+  width: 100%;
+  height: 3px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  position: relative;
+}
+
+.route-progress-fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: 2px;
+}
+
+.route-meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Flat 2x2 Telemetry Matrix */
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 12px 14px;
+  gap: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.metric-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-high);
+}
+
+.metric-value span.unit {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.metric-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Aircraft Specs */
+.specs-table {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.spec-key {
+  color: var(--text-muted);
+}
+
+.spec-val {
+  font-family: var(--font-mono);
+  color: var(--text-high);
+}
+
+/* Action Buttons */
+.inspector-actions {
+  padding: 12px 14px;
+  background: var(--surface-2);
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.action-btn {
+  flex: 1;
+  height: 30px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--text-high);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.action-btn:hover {
+  background: var(--surface-hover);
+}
+.action-btn.active {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: rgba(91, 140, 180, 0.12);
+}
+
+/* ==========================================================================
+   4. GLOBE TOOLBAR (GlobeToolbar.tsx)
+   ========================================================================== */
+.globe-tools {
+  position: absolute;
+  top: 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 20;
+  transition: right 0.18s ease;
+}
+
+.tool-btn {
+  width: 32px;
+  height: 32px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--text-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.tool-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-high);
+}
+.tool-btn.active {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+  background: rgba(91, 140, 180, 0.12);
+}
+
+.tool-dropdown {
+  position: absolute;
+  right: 40px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 30;
+}
+
+.hud-toast {
+  position: absolute;
+  right: 44px;
+  top: 80px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-high);
+  background: var(--surface-1);
+  border: 1px solid var(--border-medium);
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 30;
 }

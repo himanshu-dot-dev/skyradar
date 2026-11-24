@@ -89,78 +89,82 @@ export class AircraftCacheService {
   private async fetchFromProvider(): Promise<NormalizedAircraft[]> {
     this.isFetching = true;
 
-    // --- Stage 1: Try Primary Global Live Feed ---
     try {
-      const liveList = await FR24Adapter.fetchLive(1500);
-      if (liveList && liveList.length > 0) {
-        this.cache = liveList;
-        this.cacheMap.clear();
-        for (const ac of liveList) {
-          this.cacheMap.set(ac.id, ac);
-        }
-        this.lastFetchTimestamp = Date.now();
-        this.isConnected = true;
-        this.activeProvider = 'fr24';
-        console.log(`[AircraftCacheService] Live fleet refreshed: ${liveList.length} real aircraft loaded from primary feed.`);
-        return this.cache;
-      }
-    } catch (primaryErr: any) {
-      console.warn('[AircraftCacheService] Primary feed unavailable, failing over to OpenSky:', primaryErr?.message || primaryErr);
-    }
-
-    // --- Stage 2: Secondary Failover (OpenSky Network) ---
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-
-      const url = 'https://opensky-network.org/api/states/all';
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'SkyRadar/1.0 (FlightTrackerApp; https://github.com/himanshu-dot-dev/skyradar)',
-          Accept: 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (response.ok) {
-        const rawData = (await response.json()) as OpenSkyResponse;
-        const normalized = OpenSkyAdapter.normalize(rawData);
-
-        if (normalized.length > 0) {
-          this.cache = normalized;
+      // --- Stage 1: Try Primary Global Live Feed ---
+      try {
+        const liveList = await FR24Adapter.fetchLive(1500);
+        if (liveList && liveList.length > 0) {
+          this.cache = liveList;
           this.cacheMap.clear();
-          for (const ac of normalized) {
+          for (const ac of liveList) {
             this.cacheMap.set(ac.id, ac);
           }
           this.lastFetchTimestamp = Date.now();
           this.isConnected = true;
-          this.activeProvider = 'opensky';
-          console.log(`[AircraftCacheService] OpenSky secondary feed refreshed: ${normalized.length} live aircraft loaded.`);
+          this.activeProvider = 'fr24';
+          console.log(`[AircraftCacheService] Live fleet refreshed: ${liveList.length} real aircraft loaded from primary feed.`);
           return this.cache;
         }
-      } else {
-        console.warn(`[AircraftCacheService] OpenSky returned HTTP ${response.status}`);
+      } catch (primaryErr: any) {
+        console.warn('[AircraftCacheService] Primary feed unavailable, failing over to OpenSky:', primaryErr?.message || primaryErr);
       }
-    } catch (openSkyErr: any) {
-      console.warn('[AircraftCacheService] OpenSky secondary failover failed:', openSkyErr?.message || openSkyErr);
-    }
 
-    // --- Stage 3: Offline / Retained Fallback ---
-    this.isConnected = false;
-    this.lastFetchTimestamp = Date.now() + 15000; // 15s backoff before next cycle
+      // --- Stage 2: Secondary Failover (OpenSky Network) ---
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
 
-    // If cache is empty, ensure fallback flights exist
-    if (this.cache.length === 0) {
-      this.cache = this.generateFallbackFlights();
-      for (const ac of this.cache) {
-        this.cacheMap.set(ac.id, ac);
+        const url = 'https://opensky-network.org/api/states/all';
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'SkyRadar/1.0 (FlightTrackerApp; https://github.com/himanshu-dot-dev/skyradar)',
+            Accept: 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (response.ok) {
+          const rawData = (await response.json()) as OpenSkyResponse;
+          const normalized = OpenSkyAdapter.normalize(rawData);
+
+          if (normalized.length > 0) {
+            this.cache = normalized;
+            this.cacheMap.clear();
+            for (const ac of normalized) {
+              this.cacheMap.set(ac.id, ac);
+            }
+            this.lastFetchTimestamp = Date.now();
+            this.isConnected = true;
+            this.activeProvider = 'opensky';
+            console.log(`[AircraftCacheService] OpenSky secondary feed refreshed: ${normalized.length} live aircraft loaded.`);
+            return this.cache;
+          }
+        } else {
+          console.warn(`[AircraftCacheService] OpenSky returned HTTP ${response.status}`);
+        }
+      } catch (openSkyErr: any) {
+        console.warn('[AircraftCacheService] OpenSky secondary failover failed:', openSkyErr?.message || openSkyErr);
       }
-      this.activeProvider = 'simulated';
-    }
 
-    return this.cache;
+      // --- Stage 3: Offline / Retained Fallback ---
+      this.isConnected = false;
+      this.lastFetchTimestamp = Date.now() - this.ttlMs + 10000; // Retry in 10s
+
+      // If cache is empty, ensure fallback flights exist
+      if (this.cache.length === 0) {
+        this.cache = this.generateFallbackFlights();
+        for (const ac of this.cache) {
+          this.cacheMap.set(ac.id, ac);
+        }
+        this.activeProvider = 'simulated';
+      }
+
+      return this.cache;
+    } finally {
+      this.isFetching = false;
+    }
   }
 
   /**

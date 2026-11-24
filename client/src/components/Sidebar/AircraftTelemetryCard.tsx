@@ -1,18 +1,5 @@
 import React, { useEffect } from 'react';
-import {
-  X,
-  Plane,
-  Gauge,
-  Navigation,
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus,
-  Radio,
-  Eye,
-  MapPin,
-  Compass,
-  Crosshair,
-} from 'lucide-react';
+import { X, Crosshair, Eye } from 'lucide-react';
 import { useAircraftStore } from '../../store/aircraftStore';
 import { formatAltitude, headingToCompass } from '../../utils/geoMath';
 import type { CesiumGlobeHandle } from '../CesiumGlobe/CesiumGlobe';
@@ -44,6 +31,8 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
   const altitude = formatAltitude(position.altitudeMeters);
   const compassText = headingToCompass(movement.heading);
   const speedKmh = Math.round(movement.speedKnots * 1.852);
+  const isClimbing = movement.verticalRateFpm > 250;
+  const isDescending = movement.verticalRateFpm < -250;
 
   const handleFlyTo = () => {
     if (globeHandle) {
@@ -55,388 +44,157 @@ export const AircraftTelemetryCard: React.FC<AircraftTelemetryCardProps> = ({ gl
     }
   };
 
+  const callsign = selectedAircraft.callsign || selectedAircraft.id.toUpperCase();
+  const operator = selectedAircraft.operator || (selectedAircraft.isSimulated ? 'Corridor Flight' : 'En-route');
+  const modelText = selectedAircraft.modelDescription || selectedAircraft.aircraftType || 'Commercial Airliner';
+
   return (
-    <div
-      className="glass-panel"
-      style={{
-        position: 'absolute',
-        top: 80,
-        right: 80,
-        width: 340,
-        zIndex: 15,
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-        border: '1px solid var(--border-cyan-active)',
-        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(0, 240, 255, 0.15)',
-      }}
-    >
-      {/* Header: Callsign & Close Button */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Plane size={18} color="var(--accent-cyan)" />
-            <span
-              className="font-mono"
-              style={{
-                fontSize: 22,
-                fontWeight: 700,
-                color: 'var(--text-primary)',
-                letterSpacing: 1,
-              }}
-            >
-              {selectedAircraft.callsign || 'N/A'}
-            </span>
-          </div>
-
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
-            {selectedAircraft.operator || 'Unknown Operator'}
-          </div>
+    <aside className="inspector-panel">
+      {/* 1. Header Bar: Callsign, Operator, and Close button */}
+      <div className="inspector-header">
+        <div className="inspector-title-col">
+          <span className="inspector-callsign font-mono">{callsign}</span>
+          <span className="inspector-sub">
+            {operator} • {selectedAircraft.aircraftType || 'Aviation'}
+          </span>
         </div>
-
         <button
-          className="glass-btn"
-          style={{ width: 30, height: 30 }}
-          title="Close (Esc)"
+          className="close-inspector-btn"
+          title="Close Inspector (Esc)"
           onClick={clearSelection}
         >
-          <X size={16} />
+          <X size={15} />
         </button>
       </div>
 
-      {/* Simulated or Live Data Badge */}
-      {selectedAircraft.isSimulated ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: 'rgba(245, 158, 11, 0.12)',
-            border: '1px solid rgba(245, 158, 11, 0.35)',
-            padding: '5px 10px',
-            borderRadius: 6,
-            fontSize: 11,
-          }}
-        >
-          <span style={{ color: 'var(--accent-amber)', fontWeight: 600, letterSpacing: 0.5 }}>
-            SIMULATED FLIGHT
-          </span>
-          <span style={{ color: 'var(--text-muted)' }}>Global Corridor Model</span>
+      {/* 2. Gate-to-Gate Route Strip */}
+      {selectedAircraft.route ? (
+        <div className="route-strip">
+          <div className="route-endpoints">
+            <div>
+              <div className="endpoint-code font-mono">{selectedAircraft.route.originCode}</div>
+              <div className="endpoint-city">{selectedAircraft.route.originCity}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="endpoint-code font-mono">{selectedAircraft.route.destinationCode}</div>
+              <div className="endpoint-city right">{selectedAircraft.route.destinationCity}</div>
+            </div>
+          </div>
+
+          <div className="route-progress-track">
+            <div
+              className="route-progress-fill"
+              style={{ width: `${Math.min(100, Math.max(0, Math.round(selectedAircraft.route.progress * 100)))}%` }}
+            />
+          </div>
+
+          <div className="route-meta font-mono">
+            <span>DEP {selectedAircraft.route.originCode}</span>
+            <span style={{ color: 'var(--text-high)', fontWeight: 600 }}>
+              {Math.round(selectedAircraft.route.progress * 100)}% EN ROUTE
+            </span>
+            <span>ARR {selectedAircraft.route.destinationCode}</span>
+          </div>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: 'rgba(16, 185, 129, 0.12)',
-            border: '1px solid rgba(16, 185, 129, 0.35)',
-            padding: '5px 10px',
-            borderRadius: 6,
-            fontSize: 11,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--accent-emerald)', boxShadow: '0 0 6px var(--accent-emerald)' }} />
-            <span style={{ color: 'var(--accent-emerald)', fontWeight: 600, letterSpacing: 0.5 }}>
-              LIVE RADAR
+        <div className="route-strip">
+          <div className="route-meta font-mono" style={{ justifyContent: 'space-between' }}>
+            <span>DATA SOURCE</span>
+            <span style={{ color: selectedAircraft.isSimulated ? 'var(--accent-amber)' : 'var(--accent-green)' }}>
+              {selectedAircraft.isSimulated ? 'SIMULATED CORRIDOR' : 'LIVE ADS-B'}
             </span>
           </div>
-          <span style={{ color: 'var(--text-muted)' }}>LIVE ADS-B</span>
         </div>
       )}
 
-      {/* Aircraft Type & Registration Card */}
-      <div
-        style={{
-          backgroundColor: 'rgba(15, 23, 42, 0.55)',
-          padding: '10px',
-          borderRadius: 6,
-          border: '1px solid var(--border-cyan)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-          <span style={{ color: 'var(--text-muted)' }}>Aircraft Type:</span>
-          <strong style={{ color: 'var(--text-primary)' }}>
-            {selectedAircraft.modelDescription || selectedAircraft.aircraftType || 'Commercial Aircraft'}
-          </strong>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-          <span style={{ color: 'var(--text-muted)' }}>ICAO Code:</span>
-          <span className="font-mono" style={{ color: 'var(--accent-blue)' }}>
-            {selectedAircraft.aircraftType || 'N/A'}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-          <span style={{ color: 'var(--text-muted)' }}>Registration:</span>
-          <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
-            {selectedAircraft.registration || 'N/A'}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-          <span style={{ color: 'var(--text-muted)' }}>Mode-S Hex:</span>
-          <span className="font-mono" style={{ color: 'var(--accent-cyan)' }}>
-            {selectedAircraft.id.toUpperCase()}
-          </span>
-        </div>
-      </div>
-
-      {/* Flight Route Corridor & Waypoints or Live Flight Vector */}
-      {selectedAircraft.route ? (
-        <div
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            padding: '12px',
-            borderRadius: 6,
-            border: '1px solid var(--border-cyan)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 10, color: 'var(--accent-emerald)', fontWeight: 600 }}>DEP</span>
-                <span className="font-mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {selectedAircraft.route.originCode}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 100, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {selectedAircraft.route.originCity}
-              </div>
-            </div>
-
-            <div style={{ flex: 1, padding: '0 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: '100%', position: 'relative', height: 16, display: 'flex', alignItems: 'center' }}>
-                {/* Dotted route baseline */}
-                <div
-                  style={{
-                    width: '100%',
-                    height: 2,
-                    background: 'repeating-linear-gradient(90deg, rgba(0, 240, 255, 0.4), rgba(0, 240, 255, 0.4) 4px, transparent 4px, transparent 8px)',
-                  }}
-                />
-                {/* Progress plane icon */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: `${Math.round(selectedAircraft.route.progress * 100)}%`,
-                    transform: 'translate(-50%, 0)',
-                    color: 'var(--accent-cyan)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    filter: 'drop-shadow(0 0 6px rgba(0, 240, 255, 0.8))',
-                  }}
-                >
-                  <Plane size={15} style={{ transform: 'rotate(90deg)' }} />
-                </div>
-              </div>
-
-              <span className="font-mono" style={{ fontSize: 10, color: 'var(--accent-cyan)', fontWeight: 600 }}>
-                {Math.round(selectedAircraft.route.progress * 100)}% EN ROUTE
-              </span>
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                <span className="font-mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {selectedAircraft.route.destinationCode}
-                </span>
-                <span style={{ fontSize: 10, color: 'var(--accent-amber)', fontWeight: 600 }}>ARR</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 100, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {selectedAircraft.route.destinationCity}
-              </div>
-            </div>
+      {/* 3. Flat 2x2 Telemetry Matrix (Zero Nested Boxes) */}
+      <div className="telemetry-grid">
+        {/* Metric 1: Altitude */}
+        <div className="metric-cell">
+          <span className="metric-label">Altitude</span>
+          <div className="metric-value font-mono">
+            {position.altitudeFeet.toLocaleString()} <span className="unit">FT</span>
           </div>
-        </div>
-      ) : (
-        <div
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
-            padding: '10px 14px',
-            borderRadius: 6,
-            border: '1px solid var(--border-cyan)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <Navigation size={16} color="var(--accent-cyan)" />
-            <div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Heading</div>
-              <div className="font-mono" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                {movement.heading}° {compassText}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ height: 24, width: 1, backgroundColor: 'rgba(0, 240, 255, 0.2)' }} />
-
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ground Track</div>
-            <div className="font-mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-cyan)' }}>
-              {movement.speedKnots} KTS
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Telemetry Metrics Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {/* Altitude */}
-        <div
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            padding: '8px 10px',
-            borderRadius: 6,
-            border: '1px solid var(--border-cyan)',
-          }}
-        >
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Gauge size={12} color="var(--accent-cyan)" />
-            <span>ALTITUDE</span>
-          </div>
-          <div className="font-mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-cyan)', marginTop: 2 }}>
-            {altitude.flightLevel}
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-            {altitude.metersText}
+          <div className="metric-sub font-mono">
+            {altitude.flightLevel} • {altitude.metersText}
           </div>
         </div>
 
-        {/* Speed */}
-        <div
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            padding: '8px 10px',
-            borderRadius: 6,
-            border: '1px solid var(--border-cyan)',
-          }}
-        >
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Navigation size={12} color="var(--accent-blue)" />
-            <span>GROUND SPEED</span>
+        {/* Metric 2: Ground Speed */}
+        <div className="metric-cell">
+          <span className="metric-label">Ground Speed</span>
+          <div className="metric-value font-mono">
+            {Math.round(movement.speedKnots)} <span className="unit">KTS</span>
           </div>
-          <div className="font-mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
-            {movement.speedKnots} <span style={{ fontSize: 12, fontWeight: 400 }}>kts</span>
+          <div className="metric-sub font-mono">{speedKmh} km/h</div>
+        </div>
+
+        {/* Metric 3: Heading & Track */}
+        <div className="metric-cell">
+          <span className="metric-label">Track / Heading</span>
+          <div className="metric-value font-mono">
+            {Math.round(movement.heading)}° <span className="unit">{compassText}</span>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-            {speedKmh} km/h
+          <div className="metric-sub font-mono">
+            {isClimbing
+              ? `+${Math.round(movement.verticalRateFpm)} fpm`
+              : isDescending
+              ? `${Math.round(movement.verticalRateFpm)} fpm`
+              : 'Level flight'}
           </div>
         </div>
 
-        {/* Heading */}
-        <div
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            padding: '8px 10px',
-            borderRadius: 6,
-            border: '1px solid var(--border-cyan)',
-          }}
-        >
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Compass size={12} color="var(--accent-emerald)" />
-            <span>TRACK / HEADING</span>
-          </div>
-          <div className="font-mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
-            {movement.heading}°
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-            {compassText}
-          </div>
-        </div>
-
-        {/* Vertical Rate & Squawk */}
-        <div
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.5)',
-            padding: '8px 10px',
-            borderRadius: 6,
-            border: '1px solid var(--border-cyan)',
-          }}
-        >
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Radio size={12} color="var(--accent-amber)" />
-            <span>TRANSPONDER</span>
-          </div>
-          <div className="font-mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-amber)', marginTop: 2 }}>
+        {/* Metric 4: Transponder */}
+        <div className="metric-cell">
+          <span className="metric-label">Transponder</span>
+          <div
+            className="metric-value font-mono"
+            style={{
+              color: selectedAircraft.squawk === '7700' ? 'var(--accent-red)' : 'var(--text-high)',
+            }}
+          >
             {selectedAircraft.squawk || '1200'}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
-            {movement.verticalRateFpm > 50 ? (
-              <>
-                <ArrowUpRight size={12} color="var(--accent-emerald)" />
-                <span>+{movement.verticalRateFpm} fpm</span>
-              </>
-            ) : movement.verticalRateFpm < -50 ? (
-              <>
-                <ArrowDownRight size={12} color="var(--accent-rose)" />
-                <span>{movement.verticalRateFpm} fpm</span>
-              </>
-            ) : (
-              <>
-                <Minus size={12} />
-                <span>Level flight</span>
-              </>
-            )}
+          <div className="metric-sub font-mono">
+            Mode-S: <span style={{ color: 'var(--text-high)' }}>{selectedAircraft.id.toUpperCase()}</span>
           </div>
         </div>
       </div>
 
-      {/* Position Coordinates */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 11,
-          color: 'var(--text-muted)',
-          backgroundColor: 'rgba(15, 23, 42, 0.4)',
-          padding: '6px 10px',
-          borderRadius: 4,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <MapPin size={12} />
-          <span>Coordinates:</span>
+      {/* 4. Technical Specs List */}
+      <div className="specs-table">
+        <div className="spec-row">
+          <span className="spec-key">Aircraft Model</span>
+          <span className="spec-val">{modelText}</span>
         </div>
-        <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>
-          {position.latitude >= 0 ? `${position.latitude.toFixed(4)}°N` : `${Math.abs(position.latitude).toFixed(4)}°S`},{' '}
-          {position.longitude >= 0 ? `${position.longitude.toFixed(4)}°E` : `${Math.abs(position.longitude).toFixed(4)}°W`}
-        </span>
+        <div className="spec-row">
+          <span className="spec-key">Registration</span>
+          <span className="spec-val">{selectedAircraft.registration || 'N/A'}</span>
+        </div>
+        <div className="spec-row">
+          <span className="spec-key">Coordinates</span>
+          <span className="spec-val font-mono">
+            {position.latitude >= 0 ? `${position.latitude.toFixed(3)}° N` : `${Math.abs(position.latitude).toFixed(3)}° S`},{' '}
+            {position.longitude >= 0 ? `${position.longitude.toFixed(3)}° E` : `${Math.abs(position.longitude).toFixed(3)}° W`}
+          </span>
+        </div>
       </div>
 
-      {/* Action Buttons: Center & Follow */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <button
-          className="glass-btn"
-          style={{ padding: '8px 12px', fontSize: 12, gap: 6 }}
-          onClick={handleFlyTo}
-        >
-          <Crosshair size={14} color="var(--accent-cyan)" />
-          <span>Focus Camera</span>
+      {/* 5. Clean Action Buttons */}
+      <div className="inspector-actions">
+        <button className="action-btn" onClick={handleFlyTo} title="Focus camera on flight">
+          <Crosshair size={13} />
+          <span>Center</span>
         </button>
-
         <button
-          className={`glass-btn ${isFollowing ? 'active' : ''}`}
-          style={{ padding: '8px 12px', fontSize: 12, gap: 6 }}
+          className={`action-btn ${isFollowing ? 'active' : ''}`}
           onClick={toggleFollow}
+          title={isFollowing ? 'Unlock camera follow' : 'Lock camera to follow flight'}
         >
-          <Eye size={14} color={isFollowing ? 'var(--accent-cyan)' : 'inherit'} />
-          <span>{isFollowing ? 'Tracking Locked' : 'Follow Flight'}</span>
+          <Eye size={13} />
+          <span>{isFollowing ? 'Tracking' : 'Follow'}</span>
         </button>
       </div>
-    </div>
+    </aside>
   );
 };

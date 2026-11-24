@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Sun,
-  Moon,
   Compass,
   Plus,
   Minus,
@@ -30,7 +29,6 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   const enableLighting = useGlobeStore((s) => s.enableLighting);
   const showFlightPaths = useGlobeStore((s) => s.showFlightPaths);
   const showWeatherRadar = useGlobeStore((s) => s.showWeatherRadar);
-  const activeWeatherProvider = useGlobeStore((s) => s.activeWeatherProvider);
   const selectedHub = useGlobeStore((s) => s.selectedHub);
   const setImageryLayer = useGlobeStore((s) => s.setImageryLayer);
   const toggleLighting = useGlobeStore((s) => s.toggleLighting);
@@ -39,7 +37,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   const selectHub = useGlobeStore((s) => s.selectHub);
   const selectedAircraft = useAircraftStore((s) => s.selectedAircraft);
 
-  // Monitor live globe heading to dynamically rotate the Compass icon
+  // Dynamically track camera heading for the compass
   useEffect(() => {
     if (!globeHandle) return;
     const viewer = globeHandle.getViewer();
@@ -48,7 +46,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
     const updateHeading = () => {
       if (!viewer.isDestroyed()) {
         const deg = Math.round((viewer.camera.heading * 180) / Math.PI);
-        setCameraHeadingDeg((deg % 360 + 360) % 360);
+        setCameraHeadingDeg(((deg % 360) + 360) % 360);
       }
     };
 
@@ -64,38 +62,24 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
   const showToast = (msg: string) => {
     if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
     setToastMessage(msg);
-    toastTimeoutRef.current = window.setTimeout(() => setToastMessage(null), 3500);
+    toastTimeoutRef.current = window.setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleResetHeading = () => {
     if (globeHandle) {
       globeHandle.resetHeading();
-      showToast('🧭 Orientation Re-aligned: True North (0°)');
+      showToast('Orientation: True North (0°)');
     }
   };
 
   const handleToggleFlightPaths = () => {
-    const nextState = !showFlightPaths;
     toggleFlightPaths();
-    if (nextState) {
-      if (selectedAircraft) {
-        showToast(`🔀 Trajectory Trails Active: Showing route for ${selectedAircraft.callsign || selectedAircraft.id.toUpperCase()}`);
-      } else {
-        showToast('🔀 Trajectory Trails Enabled: Click any aircraft on the globe to inspect its 3D flight path');
-      }
-    } else {
-      showToast('🔀 Trajectory Trails Disabled');
-    }
+    showToast(!showFlightPaths ? 'Flight Trajectories: On' : 'Flight Trajectories: Off');
   };
 
   const handleToggleWeather = () => {
-    const nextState = !showWeatherRadar;
     toggleWeatherRadar();
-    if (nextState) {
-      showToast('🌧️ Doppler Weather Radar Active: RainViewer with OpenWeather / NASA Failover');
-    } else {
-      showToast('🌧️ Weather Radar Overlay Disabled');
-    }
+    showToast(!showWeatherRadar ? 'Weather Doppler: Active' : 'Weather Doppler: Off');
   };
 
   const handleSelectHub = (hub: AviationHub) => {
@@ -103,6 +87,7 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
     setShowHubMenu(false);
     if (globeHandle) {
       globeHandle.flyToHub(hub.latitude, hub.longitude, hub.cameraHeight);
+      showToast(`Navigating to ${hub.code} (${hub.city})`);
     }
   };
 
@@ -110,280 +95,173 @@ export const GlobeToolbar: React.FC<GlobeToolbarProps> = ({ globeHandle }) => {
     selectHub(null);
     if (globeHandle) {
       globeHandle.flyToHome();
+      showToast('Camera reset to global view');
     }
   };
 
   return (
-    <div
+    <aside
+      className="globe-tools"
       style={{
-        position: 'absolute',
-        right: 20,
-        top: 80,
-        zIndex: 10,
-        display: 'flex',
-        flexDirection: 'column',
+        right: selectedAircraft ? 374 : 14,
       }}
     >
-      {/* Consolidated Glassmorphic Flight Instruments HUD */}
-      <div
-        className="glass-panel"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          padding: 6,
-          gap: 6,
-          position: 'relative',
+      {/* Zoom In */}
+      <button
+        className="tool-btn"
+        title="Zoom In (+)"
+        onClick={() => globeHandle?.zoomIn()}
+      >
+        <Plus size={15} />
+      </button>
+
+      {/* Zoom Out */}
+      <button
+        className="tool-btn"
+        title="Zoom Out (-)"
+        onClick={() => globeHandle?.zoomOut()}
+      >
+        <Minus size={15} />
+      </button>
+
+      {/* Compass Orientation */}
+      <button
+        className="tool-btn"
+        title={`Reset North (Heading: ${cameraHeadingDeg}°)`}
+        onClick={handleResetHeading}
+      >
+        <Compass
+          size={15}
+          style={{
+            transform: `rotate(${-cameraHeadingDeg}deg)`,
+            transition: 'transform 0.15s ease-out',
+          }}
+        />
+      </button>
+
+      <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
+
+      {/* Flight Paths / Arcs */}
+      <button
+        className={`tool-btn ${showFlightPaths ? 'active' : ''}`}
+        title={showFlightPaths ? 'Hide Flight Trajectories' : 'Show Flight Trajectories'}
+        onClick={handleToggleFlightPaths}
+      >
+        <Route size={15} />
+      </button>
+
+      {/* Weather Doppler Radar */}
+      <button
+        className={`tool-btn ${showWeatherRadar ? 'active' : ''}`}
+        title={showWeatherRadar ? 'Hide Weather Radar' : 'Show Weather Radar'}
+        onClick={handleToggleWeather}
+      >
+        <CloudRain size={15} />
+      </button>
+
+      {/* Day / Night Terminator */}
+      <button
+        className={`tool-btn ${enableLighting ? 'active' : ''}`}
+        title={enableLighting ? 'Disable Sun Shadow' : 'Enable Real-time Sun Shadow'}
+        onClick={toggleLighting}
+      >
+        <Sun size={15} color={enableLighting ? 'var(--accent-amber)' : 'inherit'} />
+      </button>
+
+      {/* Satellite Imagery Menu Toggle */}
+      <button
+        className={`tool-btn ${showLayerMenu ? 'active' : ''}`}
+        title="Satellite Imagery Layers"
+        onClick={() => {
+          setShowLayerMenu(!showLayerMenu);
+          setShowHubMenu(false);
         }}
       >
-        {/* Zoom Controls */}
-        <button
-          className="glass-btn"
-          style={{ width: 38, height: 38 }}
-          title="Zoom In (or double-click on Earth)"
-          onClick={() => globeHandle?.zoomIn()}
-        >
-          <Plus size={18} />
-        </button>
+        <Layers size={15} />
+      </button>
 
-        <button
-          className="glass-btn"
-          style={{ width: 38, height: 38 }}
-          title="Zoom Out (or scroll mouse wheel)"
-          onClick={() => globeHandle?.zoomOut()}
-        >
-          <Minus size={18} />
-        </button>
+      {/* Aviation Hubs Menu Toggle */}
+      <button
+        className={`tool-btn ${showHubMenu || selectedHub ? 'active' : ''}`}
+        title="Aviation Hub Teleport"
+        onClick={() => {
+          setShowHubMenu(!showHubMenu);
+          setShowLayerMenu(false);
+        }}
+      >
+        <MapPin size={15} />
+      </button>
 
-        {/* Live Rotating Heading Compass */}
-        <button
-          className="glass-btn"
-          style={{ width: 38, height: 38 }}
-          title={`Reset Orientation: North Up (Current Heading: ${cameraHeadingDeg}°)`}
-          onClick={handleResetHeading}
-        >
-          <Compass
-            size={18}
-            style={{
-              transform: `rotate(${-cameraHeadingDeg}deg)`,
-              transition: 'transform 0.15s ease-out',
-            }}
-          />
-        </button>
+      <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
 
-        <div style={{ height: 1, backgroundColor: 'rgba(0, 240, 255, 0.2)', margin: '2px 4px' }} />
+      {/* Reset Camera View */}
+      <button
+        className="tool-btn"
+        title="Reset Global View"
+        onClick={handleResetHome}
+      >
+        <RotateCcw size={14} />
+      </button>
 
-        {/* Flight Trajectory Paths Toggle */}
-        <button
-          className={`glass-btn ${showFlightPaths ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title={
-            showFlightPaths
-              ? selectedAircraft
-                ? `Hide Flight Trajectory Trails (Active for ${selectedAircraft.callsign || selectedAircraft.id.toUpperCase()})`
-                : 'Flight Trajectories: Enabled (Click any flight to view trajectory)'
-              : 'Show Flight Trajectory Trails'
-          }
-          onClick={handleToggleFlightPaths}
-        >
-          <Route size={18} color={showFlightPaths ? 'var(--accent-cyan)' : 'inherit'} />
-        </button>
+      {/* Toast Feedback */}
+      {toastMessage && <div className="hud-toast">{toastMessage}</div>}
 
-        {/* Live Doppler Weather Radar Toggle */}
-        <button
-          className={`glass-btn ${showWeatherRadar ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title={
-            showWeatherRadar
-              ? `Live Weather Radar: Enabled (${activeWeatherProvider.toUpperCase()})`
-              : 'Toggle Live Weather Radar (RainViewer Doppler / OpenWeather / NASA GIBS)'
-          }
-          onClick={handleToggleWeather}
-        >
-          <CloudRain size={18} color={showWeatherRadar ? 'var(--accent-cyan)' : 'inherit'} />
-        </button>
-
-        {/* Tactical HUD Toast Banner for Instruments Feedback */}
-        {toastMessage && (
-          <div
-            className="glass-panel"
-            style={{
-              position: 'absolute',
-              right: 56,
-              top: 90,
-              padding: '8px 14px',
-              fontSize: 12,
-              fontFamily: '"JetBrains Mono", monospace',
-              color: '#00f0ff',
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
-              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 240, 255, 0.25)',
-              border: '1px solid rgba(0, 240, 255, 0.45)',
-              zIndex: 30,
-            }}
-          >
-            {toastMessage}
+      {/* Dropdown: Imagery Layers */}
+      {showLayerMenu && (
+        <div className="tool-dropdown" style={{ top: 140, width: 170 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '2px 6px' }}>
+            Base Layer
           </div>
-        )}
-
-        {/* Day / Night Sun Terminator */}
-        <button
-          className={`glass-btn ${enableLighting ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title={enableLighting ? 'Disable Sun Terminator (Full Daytime)' : 'Enable Real-Time Sun Terminator (Day/Night Shadow)'}
-          onClick={toggleLighting}
-        >
-          {enableLighting ? <Sun size={18} color="var(--accent-amber)" /> : <Sun size={18} />}
-        </button>
-
-        {/* Layer Selector */}
-        <button
-          className={`glass-btn ${showLayerMenu ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title="Earth Imagery Layers"
-          onClick={() => {
-            setShowLayerMenu(!showLayerMenu);
-            setShowHubMenu(false);
-          }}
-        >
-          <Layers size={18} />
-        </button>
-
-        {/* Major Aviation Hubs Menu */}
-        <button
-          className={`glass-btn ${showHubMenu || selectedHub ? 'active' : ''}`}
-          style={{ width: 38, height: 38 }}
-          title="Teleport to Major Aviation Hub"
-          onClick={() => {
-            setShowHubMenu(!showHubMenu);
-            setShowLayerMenu(false);
-          }}
-        >
-          <MapPin size={18} />
-        </button>
-
-        <div style={{ height: 1, backgroundColor: 'rgba(0, 240, 255, 0.2)', margin: '2px 4px' }} />
-
-        {/* Reset Global Camera Home */}
-        <button
-          className="glass-btn"
-          style={{ width: 38, height: 38 }}
-          title="Reset Global View"
-          onClick={handleResetHome}
-        >
-          <RotateCcw size={17} />
-        </button>
-
-        {/* Popup: Imagery Layers Menu */}
-        {showLayerMenu && (
-          <div
-            className="glass-panel"
-            style={{
-              position: 'absolute',
-              right: 50,
-              top: 140,
-              width: 210,
-              padding: 10,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
-              Satellite Imagery
-            </div>
-
+          {[
+            { id: 'blue-marble', label: 'NASA Blue Marble' },
+            { id: 'dark-radar', label: 'Tactical Dark' },
+            { id: 'natural-earth', label: 'Natural Earth II' },
+          ].map((layer) => (
             <button
-              className={`glass-btn ${imageryLayer === 'blue-marble' ? 'active' : ''}`}
-              style={{ justifyContent: 'flex-start', padding: '8px 12px', fontSize: 13, gap: 8 }}
+              key={layer.id}
+              className={`filter-btn ${imageryLayer === layer.id ? 'active' : ''}`}
+              style={{ textAlign: 'left', padding: '6px 8px', fontSize: 11 }}
               onClick={() => {
-                setImageryLayer('blue-marble');
+                setImageryLayer(layer.id as any);
                 setShowLayerMenu(false);
               }}
             >
-              <Sun size={15} />
-              <span>NASA Blue Marble</span>
+              {layer.label}
             </button>
+          ))}
+        </div>
+      )}
 
-            <button
-              className={`glass-btn ${imageryLayer === 'dark-radar' ? 'active' : ''}`}
-              style={{ justifyContent: 'flex-start', padding: '8px 12px', fontSize: 13, gap: 8 }}
-              onClick={() => {
-                setImageryLayer('dark-radar');
-                setShowLayerMenu(false);
-              }}
-            >
-              <Moon size={15} />
-              <span>Tactical Dark Radar</span>
-            </button>
-
-            <button
-              className={`glass-btn ${imageryLayer === 'natural-earth' ? 'active' : ''}`}
-              style={{ justifyContent: 'flex-start', padding: '8px 12px', fontSize: 13, gap: 8 }}
-              onClick={() => {
-                setImageryLayer('natural-earth');
-                setShowLayerMenu(false);
-              }}
-            >
-              <Layers size={15} />
-              <span>Natural Earth II</span>
-            </button>
+      {/* Dropdown: Aviation Hubs */}
+      {showHubMenu && (
+        <div className="tool-dropdown" style={{ top: 180, width: 200, maxHeight: 300, overflowY: 'auto' }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '2px 6px' }}>
+            Major Hubs
           </div>
-        )}
-
-        {/* Popup: Aviation Hubs Menu */}
-        {showHubMenu && (
-          <div
-            className="glass-panel"
-            style={{
-              position: 'absolute',
-              right: 50,
-              top: 180,
-              width: 250,
-              maxHeight: 380,
-              overflowY: 'auto',
-              padding: 10,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
-              Major Flight Hubs
-            </div>
-
-            {AVIATION_HUBS.map((hub) => (
-              <button
-                key={hub.id}
-                className={`glass-btn ${selectedHub?.id === hub.id ? 'active' : ''}`}
-                style={{
-                  justifyContent: 'space-between',
-                  padding: '7px 10px',
-                  fontSize: 12,
-                }}
-                onClick={() => handleSelectHub(hub)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span
-                    className="font-mono"
-                    style={{
-                      backgroundColor: 'rgba(0, 240, 255, 0.15)',
-                      padding: '2px 5px',
-                      borderRadius: 4,
-                      color: 'var(--accent-cyan)',
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {hub.code}
-                  </span>
-                  <span>{hub.city}</span>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{hub.country}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+          {AVIATION_HUBS.map((hub) => (
+            <button
+              key={hub.id}
+              className={`filter-btn ${selectedHub?.id === hub.id ? 'active' : ''}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '6px 8px',
+                fontSize: 11,
+              }}
+              onClick={() => handleSelectHub(hub)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="font-mono" style={{ color: 'var(--accent-blue)', fontWeight: 700 }}>
+                  {hub.code}
+                </span>
+                <span>{hub.city}</span>
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{hub.country}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </aside>
   );
 };

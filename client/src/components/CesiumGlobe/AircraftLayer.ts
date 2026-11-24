@@ -32,16 +32,14 @@ function getAirlinerTexture(altitudeColor: string, isSelected: boolean): string 
     // Soft outer surveillance halo
     ctx.beginPath();
     ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0, 240, 255, 0.12)';
+    ctx.fillStyle = 'rgba(91, 140, 180, 0.15)';
     ctx.fill();
 
-    // Sharp cyan reticle ring
+    // Sharp steel-blue reticle ring
     ctx.beginPath();
     ctx.arc(cx, cy, size * 0.44, 0, Math.PI * 2);
-    ctx.strokeStyle = '#00f0ff';
-    ctx.lineWidth = 2.0;
-    ctx.shadowColor = '#00f0ff';
-    ctx.shadowBlur = 10;
+    ctx.strokeStyle = '#5b8cb4';
+    ctx.lineWidth = 1.8;
     ctx.stroke();
 
     // Crosshairs with center gap
@@ -55,8 +53,8 @@ function getAirlinerTexture(altitudeColor: string, isSelected: boolean): string 
     ctx.moveTo(8, cy); ctx.lineTo(cx - gap, cy);
     // Right
     ctx.moveTo(size - 8, cy); ctx.lineTo(cx + gap, cy);
-    ctx.strokeStyle = '#00f0ff';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#5b8cb4';
+    ctx.lineWidth = 1.2;
     ctx.stroke();
 
     // 4 Corner brackets
@@ -79,8 +77,8 @@ function getAirlinerTexture(altitudeColor: string, isSelected: boolean): string 
     ctx.moveTo(cx + bDist - bLen, cy + bDist);
     ctx.lineTo(cx + bDist, cy + bDist);
     ctx.lineTo(cx + bDist, cy + bDist - bLen);
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(91, 140, 180, 0.85)';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
   }
@@ -93,8 +91,8 @@ function getAirlinerTexture(altitudeColor: string, isSelected: boolean): string 
   ctx.scale(s, s);
 
   const outlineColor = '#334155';
-  const redAccent = isSelected ? '#00f0ff' : '#dc2626';
-  const redShadow = isSelected ? '#0284c7' : '#991b1b';
+  const redAccent = isSelected ? '#5b8cb4' : '#dc2626';
+  const redShadow = isSelected ? '#3b688c' : '#991b1b';
 
   // --- 2. HORIZONTAL STABILIZERS (Tail Wings) ---
   ctx.beginPath();
@@ -537,13 +535,13 @@ export class AircraftLayer {
         : '600 22px "JetBrains Mono", monospace';
 
       const labelFillColor = isSelected
-        ? Cesium.Color.fromCssColorString('#00f0ff')
-        : Cesium.Color.WHITE;
+        ? Cesium.Color.fromCssColorString('#d8dfe8')
+        : Cesium.Color.fromCssColorString('#8893a4');
 
-      // High-contrast solid dark glass background
+      // Calibrated low-contrast slate glass background
       const labelBgColor = isSelected
-        ? Cesium.Color.fromCssColorString('rgba(2, 6, 23, 0.95)')
-        : Cesium.Color.fromCssColorString('rgba(15, 23, 42, 0.90)');
+        ? Cesium.Color.fromCssColorString('rgba(17, 21, 29, 0.95)')
+        : Cesium.Color.fromCssColorString('rgba(12, 15, 20, 0.85)');
 
       const labelPadding = isSelected
         ? new Cesium.Cartesian2(14, 8)
