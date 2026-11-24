@@ -1,7 +1,13 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { aircraftCache } from './services/aircraftCache.js';
 import type { AircraftQueryFilter } from './types/providers.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -69,6 +75,26 @@ app.get('/api/aircraft/:id', (req: Request, res: Response) => {
   }
   res.json(aircraft);
 });
+
+// Production: Serve the built Vite client SPA if client/dist exists
+const clientDistCandidates = [
+  path.resolve(__dirname, '../../../../client/dist'),
+  path.resolve(__dirname, '../../../client/dist'),
+  path.resolve(process.cwd(), 'client/dist'),
+];
+
+const clientDistPath = clientDistCandidates.find((p) => fs.existsSync(p));
+
+if (clientDistPath) {
+  console.log(`🌐 [SkyRadar Server] Serving client static files from: ${clientDistPath}`);
+  app.use(express.static(clientDistPath));
+  app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`📡 [SkyRadar Server] Live ADS-B backend running on port ${PORT}`);

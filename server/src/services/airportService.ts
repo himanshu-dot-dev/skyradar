@@ -17,12 +17,20 @@ function loadAirports(): Record<string, AirportRecord> {
   if (airportsMap) return airportsMap;
   try {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
-    const filePath = path.resolve(currentDir, '../data/airports.json');
-    if (fs.existsSync(filePath)) {
+    const candidates = [
+      path.resolve(currentDir, '../data/airports.json'),
+      path.resolve(currentDir, '../../src/data/airports.json'),
+      path.resolve(currentDir, '../../../src/data/airports.json'),
+      path.resolve(process.cwd(), 'server/src/data/airports.json'),
+      path.resolve(process.cwd(), 'src/data/airports.json'),
+    ];
+    const filePath = candidates.find((p) => fs.existsSync(p));
+
+    if (filePath && fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf-8');
       airportsMap = JSON.parse(raw);
     } else {
-      console.warn('[AirportService] airports.json not found at:', filePath);
+      console.warn('[AirportService] airports.json not found in candidate paths');
       airportsMap = {};
     }
   } catch (err) {

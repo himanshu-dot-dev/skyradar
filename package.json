@@ -14,6 +14,7 @@
     "build:client": "npm --workspace=client run build",
     "build:server": "npm --workspace=server run build",
     "build": "npm --workspace=client run build && npm --workspace=server run build",
+    "start": "node server/dist/server/src/index.js",
     "lint": "npm --workspace=client run lint"
   },
   "keywords": [
