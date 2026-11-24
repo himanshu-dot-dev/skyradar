@@ -4,6 +4,7 @@ import { GlobeToolbar } from './components/Controls/GlobeToolbar';
 import { Header } from './components/Header/Header';
 import { AircraftTelemetryCard } from './components/Sidebar/AircraftTelemetryCard';
 import { AircraftSearchDrawer } from './components/Sidebar/AircraftSearchDrawer';
+import { SkyPreloader } from './components/Preloader/SkyPreloader';
 import { useAircraftStore } from './store/aircraftStore';
 import { useGlobeStore } from './store/globeStore';
 
@@ -18,6 +19,9 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
+      {/* Full-Screen Fast Cloud & Airliner Preloader */}
+      <SkyPreloader isGlobeReady={globeHandle !== null} />
+
       {/* 3D Cesium Earth Canvas */}
       <CesiumGlobe onViewerReady={setGlobeHandle} />
 
