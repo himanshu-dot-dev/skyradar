@@ -8,7 +8,7 @@ COPY client/package.json ./client/
 COPY server/package.json ./server/
 COPY shared ./shared/
 
-RUN npm install --include=dev --no-audit --no-fund
+RUN rm -f package-lock.json && npm install --include=dev --include=optional --no-audit --no-fund
 
 COPY client ./client/
 COPY server ./server/
