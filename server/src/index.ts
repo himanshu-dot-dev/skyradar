@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
 app.use(cors());
 app.use(express.json());
@@ -106,7 +106,7 @@ if (clientDistPath) {
   });
 }
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`📡 [SkyRadar Server] Live ADS-B backend running on port ${PORT}`);
   // Pre-warm the cache immediately
   aircraftCache.getAircraft().catch((e) => console.error('Initial cache warm-up error:', e));
