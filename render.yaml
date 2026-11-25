@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: skyradar
+    runtime: node
+    plan: free
+    buildCommand: npm ci && NODE_OPTIONS="--max-old-space-size=1536" npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VITE_CESIUM_ION_TOKEN
+        sync: false
+      - key: OPENSKY_CLIENT_ID
+        sync: false
+      - key: OPENSKY_CLIENT_SECRET
+        sync: false
+      - key: ADSB_LOL_API_KEY
+        sync: false

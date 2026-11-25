@@ -87,17 +87,38 @@ const clientDistPath = clientDistCandidates.find((p) => fs.existsSync(p));
 
 if (clientDistPath) {
   console.log(`🌐 [SkyRadar Server] Serving client static files from: ${clientDistPath}`);
-  app.use(express.static(clientDistPath));
+  app.use(
+    express.static(clientDistPath, {
+      maxAge: '7d',
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    })
+  );
   app.get('*', (req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith('/api')) {
       return next();
     }
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`📡 [SkyRadar Server] Live ADS-B backend running on port ${PORT}`);
   // Pre-warm the cache immediately
   aircraftCache.getAircraft().catch((e) => console.error('Initial cache warm-up error:', e));
 });
+
+const shutdown = (signal: string) => {
+  console.log(`🛑 [SkyRadar Server] Received ${signal}, shutting down gracefully...`);
+  server.close(() => {
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 5000).unref();
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

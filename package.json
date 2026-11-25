@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "SkyRadar — Real-Time 3D Global Flight Tracker",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "workspaces": [
     "client",
     "server",
