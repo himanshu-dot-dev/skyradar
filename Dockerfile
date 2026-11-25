@@ -8,7 +8,7 @@ COPY client/package.json ./client/
 COPY server/package.json ./server/
 COPY shared ./shared/
 
-RUN npm ci
+RUN npm install --include=dev --no-audit --no-fund
 
 COPY client ./client/
 COPY server ./server/
@@ -28,7 +28,7 @@ COPY package.json package-lock.json ./
 COPY client/package.json ./client/
 COPY server/package.json ./server/
 
-RUN npm ci --omit=dev --workspace=server
+RUN npm install --omit=dev --no-audit --no-fund --workspace=server
 
 COPY --from=builder /app/client/dist ./client/dist
 COPY --from=builder /app/server/dist ./server/dist
